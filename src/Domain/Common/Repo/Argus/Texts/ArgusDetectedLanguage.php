@@ -51,7 +51,7 @@ class ArgusDetectedLanguage extends DetectedLanguage
 
     public function getUserContent(): string|array
     {
-        $content = (string)($this->getParent()->content ?? '');
+        $content = ($this->getParent()->content ?? '');
         $content = trim($content);
         if ($content === '') {
             return '';

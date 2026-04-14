@@ -19,6 +19,6 @@ use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineQueryBuilder;
  */
 class DBAppTranslationValue extends DBEntity
 {
-    public const BASE_ENTITY_CLASS = AppTranslationValue::class;
-    public const BASE_ORM_MODEL = DBAppTranslationValueModel::class;
+    public const string BASE_ENTITY_CLASS = AppTranslationValue::class;
+    public const string BASE_ORM_MODEL = DBAppTranslationValueModel::class;
 }

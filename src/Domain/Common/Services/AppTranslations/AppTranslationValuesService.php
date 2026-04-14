@@ -23,7 +23,7 @@ use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationValues;
  */
 class AppTranslationValuesService extends EntitiesService
 {
-    public const DEFAULT_ENTITY_CLASS = AppTranslationValue::class;
+    public const string DEFAULT_ENTITY_CLASS = AppTranslationValue::class;
 
     /**
      * Find AppTranslationValues for a given language ID and key strings

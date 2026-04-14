@@ -25,7 +25,7 @@ use DDD\Domain\Common\Services\LanguagesService;
  */
 class AppTranslationDefaultTermsService extends EntitiesService
 {
-    public const DEFAULT_ENTITY_CLASS = AppTranslationDefaultTerm::class;
+    public const string DEFAULT_ENTITY_CLASS = AppTranslationDefaultTerm::class;
 
     /**
      * Find default terms for a given Language entity

@@ -19,6 +19,6 @@ use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineQueryBuilder;
  */
 class DBAppTranslationDefaultTerm extends DBEntity
 {
-    public const BASE_ENTITY_CLASS = AppTranslationDefaultTerm::class;
-    public const BASE_ORM_MODEL = DBAppTranslationDefaultTermModel::class;
+    public const string BASE_ENTITY_CLASS = AppTranslationDefaultTerm::class;
+    public const string BASE_ORM_MODEL = DBAppTranslationDefaultTermModel::class;
 }

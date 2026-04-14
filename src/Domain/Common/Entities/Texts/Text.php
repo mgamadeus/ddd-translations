@@ -27,16 +27,16 @@ use DDD\Infrastructure\Validation\Constraints\Choice;
 class Text extends ValueObject
 {
     /** @var string Formal writing style */
-    public const WRITING_STYLE_FORMAL = 'FORMAL';
+    public const string WRITING_STYLE_FORMAL = 'FORMAL';
 
     /** @var string Informal writing style */
-    public const WRITING_STYLE_INFORMAL = 'INFORMAL';
+    public const string WRITING_STYLE_INFORMAL = 'INFORMAL';
 
     /** @var string The context of the translation is singular */
-    public const CONTEXT_ONE = 'ONE';
+    public const string CONTEXT_ONE = 'ONE';
 
     /** @var string The context of the translation is plural */
-    public const CONTEXT_MANY = 'MANY';
+    public const string CONTEXT_MANY = 'MANY';
 
     /** @var string|null The content of the text */
     public ?string $content;

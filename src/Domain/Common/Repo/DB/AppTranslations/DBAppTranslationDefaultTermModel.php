@@ -16,11 +16,11 @@ use DDD\Domain\Base\Repo\DB\Database\DatabaseColumn;
 #[ORM\Table(name: 'AppTranslationDefaultTerms')]
 class DBAppTranslationDefaultTermModel extends DoctrineModel
 {
-	public const MODEL_ALIAS = 'AppTranslationDefaultTerm';
+	public const string MODEL_ALIAS = 'AppTranslationDefaultTerm';
 
-	public const TABLE_NAME = 'AppTranslationDefaultTerms';
+	public const string TABLE_NAME = 'AppTranslationDefaultTerms';
 
-	public const ENTITY_CLASS = 'App\Domain\Common\Entities\AppTranslations\AppTranslationDefaultTerm';
+	public const string ENTITY_CLASS = 'App\Domain\Common\Entities\AppTranslations\AppTranslationDefaultTerm';
 
 	#[ORM\Column(type: 'integer')]
 	public ?int $languageId;

@@ -2,19 +2,18 @@
 
 namespace DDD\Domain\Common\Services\Translations;
 
-use DDD\Domain\AI\Entities\Prompts\AIPrompt;
 use DDD\Domain\AI\Services\AIPromptsService;
-use DDD\Domain\Common\Entities\Texts\TranslationPrompts;
+use DDD\Domain\Base\Entities\EntitySet;
 use DDD\Domain\Base\Entities\Translatable\Translatable;
+use DDD\Domain\Base\Entities\Translatable\TranslatableTrait;
 use DDD\Domain\Common\Entities\Locales\Locale;
 use DDD\Domain\Common\Entities\Locales\Locales;
 use DDD\Domain\Common\Entities\Texts\Buckets\TextsBuckets;
 use DDD\Domain\Common\Entities\Texts\Text;
 use DDD\Domain\Common\Entities\Texts\Texts;
+use DDD\Domain\Common\Entities\Texts\TranslationPrompts;
 use DDD\Domain\Common\Repo\Argus\Texts\Buckets\ArgusTextsBuckets;
 use DDD\Domain\Common\Repo\Argus\Texts\Translations\ArgusTranslations;
-use DDD\Domain\Base\Entities\EntitySet;
-use DDD\Domain\Base\Entities\Translatable\TranslatableTrait;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Reflection\ReflectionClass;
 use DDD\Infrastructure\Services\DDDService;
@@ -39,8 +38,7 @@ class AITranslationsService
         ?Locales $localesToTranslate = null,
         bool $storeAutomatically = false,
         bool $async = true
-    ): EntitySet
-    {
+    ): EntitySet {
         $texts = new Texts();
         if (!$localesToTranslate) {
             $localesToTranslate = Translatable::getActiveLocalesSet();
@@ -83,7 +81,7 @@ class AITranslationsService
             }
             /** @var TranslatableTrait $entity */
             foreach ($translatedText->translations->getElements() as $translation) {
-                if (!$translation->content){
+                if (!$translation->content) {
                     continue;
                 }
                 $entity->setTranslationForProperty(
@@ -91,13 +89,13 @@ class AITranslationsService
                     $translation->content,
                     languageCode: $translation->locale->languageCode,
                     countryCode: null,
-                    writingStyle: $translation->writingStyle == Text::WRITING_STYLE_FORMAL?Translatable::WRITING_STYLE_FORMAL:Translatable::WRITING_STYLE_INFORMAL
+                    writingStyle: $translation->writingStyle == Text::WRITING_STYLE_FORMAL ? Translatable::WRITING_STYLE_FORMAL : Translatable::WRITING_STYLE_INFORMAL
                 );
             }
         }
         //Translatable::restoreTranslationSettingsSnapshot();
         if ($storeAutomatically) {
-            foreach($entitySet->getElements() as $entity) {
+            foreach ($entitySet->getElements() as $entity) {
                 $entity->update();
             }
         }
@@ -128,7 +126,7 @@ class AITranslationsService
         $languageCodesToTranslate = $localesToTranslate->getLanguageCodes();
         $missingLocales = new Locales();
         foreach ($localesToTranslate->getElements() as $localeToTranslate) {
-            if (!isset($translations[$localeToTranslate->languageCode . '::' . \DDD\Domain\Base\Entities\Translatable\Translatable::WRITING_STYLE_FORMAL]) || $forceRetranslation) {
+            if (!isset($translations[$localeToTranslate->languageCode . '::' . Translatable::WRITING_STYLE_FORMAL]) || $forceRetranslation) {
                 $localesAreMissing = true;
                 $text->addLocaleToTranslate(locale: $localeToTranslate);
             }
@@ -140,7 +138,8 @@ class AITranslationsService
 
         if (isset($translations[Translatable::getDefaultLanguageCode() . '::' . Translatable::WRITING_STYLE_FORMAL])) {
             $text->locale = new Locale(
-                Translatable::getDefaultLanguageCode(), Config::get('Common.Political.Locales.defaultCountryCodesForLanguage')[Translatable::getDefaultLanguageCode()]
+                Translatable::getDefaultLanguageCode(),
+                Config::get('Common.Political.Locales.defaultCountryCodesForLanguage')[Translatable::getDefaultLanguageCode()]
             );
             $text->content = $translations[Translatable::getDefaultLanguageCode() . '::' . Translatable::WRITING_STYLE_FORMAL];
         } elseif (isset($translations['de::' . Translatable::WRITING_STYLE_FORMAL])) {

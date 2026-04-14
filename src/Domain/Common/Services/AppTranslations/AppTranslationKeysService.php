@@ -23,7 +23,7 @@ use DDD\Domain\Base\Services\EntitiesService;
  */
 class AppTranslationKeysService extends EntitiesService
 {
-    public const DEFAULT_ENTITY_CLASS = AppTranslationKey::class;
+    public const string DEFAULT_ENTITY_CLASS = AppTranslationKey::class;
 
     /**
      * Find an AppTranslationKey by its key string

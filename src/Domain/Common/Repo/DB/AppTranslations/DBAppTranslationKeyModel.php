@@ -15,11 +15,11 @@ use DDD\Domain\Base\Repo\DB\Database\DatabaseColumn;
 #[ORM\Table(name: 'AppTranslationKeys')]
 class DBAppTranslationKeyModel extends DoctrineModel
 {
-	public const MODEL_ALIAS = 'AppTranslationKey';
+	public const string MODEL_ALIAS = 'AppTranslationKey';
 
-	public const TABLE_NAME = 'AppTranslationKeys';
+	public const string TABLE_NAME = 'AppTranslationKeys';
 
-	public const ENTITY_CLASS = 'App\Domain\Common\Entities\AppTranslations\AppTranslationKey';
+	public const string ENTITY_CLASS = 'App\Domain\Common\Entities\AppTranslations\AppTranslationKey';
 
 	#[ORM\Column(type: 'string')]
 	public ?string $key;

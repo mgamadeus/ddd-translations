@@ -13,6 +13,6 @@ use DDD\Domain\Base\Repo\DB\Doctrine\DoctrineQueryBuilder;
  */
 class DBAppTranslationValues extends DBEntitySet
 {
-    public const BASE_REPO_CLASS = DBAppTranslationValue::class;
-    public const BASE_ENTITY_SET_CLASS = AppTranslationValues::class;
+    public const string BASE_REPO_CLASS = DBAppTranslationValue::class;
+    public const string BASE_ENTITY_SET_CLASS = AppTranslationValues::class;
 }
