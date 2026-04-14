@@ -4,7 +4,7 @@ namespace DDD\Domain\Common\Services;
 
 use DDD\Domain\AI\Entities\Prompts\AIPrompt;
 use DDD\Domain\AI\Services\AIPromptsService;
-use DDD\Domain\Common\TranslationPrompts;
+use DDD\Domain\Common\Entities\Texts\TranslationPrompts;
 use DDD\Domain\Base\Entities\Translatable\Translatable;
 use DDD\Domain\Common\Entities\Locales\Locale;
 use DDD\Domain\Common\Entities\Locales\Locales;
@@ -13,11 +13,11 @@ use DDD\Domain\Common\Entities\Texts\Text;
 use DDD\Domain\Common\Entities\Texts\Texts;
 use DDD\Domain\Common\Repo\Argus\Texts\Buckets\ArgusTextsBuckets;
 use DDD\Domain\Common\Repo\Argus\Texts\Translations\ArgusTranslations;
-use DDD\Infrastructure\Services\AppService;
 use DDD\Domain\Base\Entities\EntitySet;
 use DDD\Domain\Base\Entities\Translatable\TranslatableTrait;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Reflection\ReflectionClass;
+use DDD\Infrastructure\Services\DDDService;
 use GuzzleHttp\Exception\GuzzleException;
 use ReflectionException;
 
@@ -173,7 +173,7 @@ class AITranslationsService
     {
         $textsBuckets = new TextsBuckets();
         /** @var AIPromptsService $aiPromptsService */
-        $aiPromptsService = AppService::instance()->getService(AIPromptsService::class);
+        $aiPromptsService = DDDService::instance()->getService(AIPromptsService::class);
 
         $maxCharsPerBucket = self::MAX_CHARS_PER_BUCKET;
 

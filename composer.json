@@ -3,7 +3,7 @@
     "description": "Texts, entity translations, app translations, embeddings for mgamadeus/ddd",
     "minimum-stability": "stable",
     "license": "MIT",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "authors": [
         {
             "name": "Marius-Eugen Gerdan",
@@ -17,16 +17,15 @@
     },
     "autoload": {
         "psr-4": {
-            "DDD\\Modules\\Translations\\": "src/",
-            "DDD\\Domain\\Common\\Entities\\Texts\\": "src/Domain/Common/Entities/Texts/",
-            "DDD\\Domain\\Common\\Entities\\AppTranslations\\": "src/Domain/Common/Entities/AppTranslations/",
-            "DDD\\Domain\\Common\\Repo\\Argus\\Texts\\": "src/Domain/Common/Repo/Argus/Texts/",
-            "DDD\\Domain\\Common\\Repo\\DB\\AppTranslations\\": "src/Domain/Common/Repo/DB/AppTranslations/",
-            "DDD\\Domain\\Common\\Services\\AppTranslations\\": "src/Domain/Common/Services/AppTranslations/",
-            "DDD\\Domain\\Common\\MessageHandlers\\": "src/Domain/Common/MessageHandlers/"
+            "DDD\\": "src/"
         }
     },
     "extra": {
         "ddd-module": "DDD\\Modules\\Translations\\TranslationsModule"
+    },
+    "config": {
+        "allow-plugins": {
+            "symfony/runtime": true
+        }
     }
 }

@@ -7,7 +7,7 @@ namespace DDD\Domain\Common\Repo\Argus\Texts;
 use DDD\Domain\AI\Entities\Models\AIModel;
 use DDD\Domain\AI\Entities\Prompts\AIPrompt;
 use DDD\Domain\AI\Repo\Argus\Attributes\ArgusLanguageModel;
-use DDD\Domain\Common\TranslationPrompts;
+use DDD\Domain\Common\Entities\Texts\TranslationPrompts;
 use DDD\Domain\AI\Repo\Argus\Traits\ArgusAILanguageModelTrait;
 use DDD\Domain\Base\Repo\Argus\Attributes\ArgusLoad;
 use DDD\Domain\Base\Repo\Argus\Traits\ArgusTrait;

@@ -8,11 +8,12 @@ use DDD\Domain\Common\Entities\Locales\Locale;
 use DDD\Domain\Common\Entities\Locales\Locales;
 use DDD\Domain\Common\Entities\Texts\Translations\Translations;
 use DDD\Domain\Common\Repo\Argus\Texts\ArgusTexts;
-use DDD\Infrastructure\Services\AppService;
+use DDD\Domain\Common\Services\AppTranslations\AppTranslationsService;
 use DDD\Domain\Base\Entities\BaseObject;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Domain\Base\Entities\ObjectSet;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
+use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Validation\Constraints\Choice;
 use Override;
 
@@ -97,7 +98,7 @@ class Texts extends ObjectSet
     public function translate(bool $async = true): void
     {
         /** @var AppTranslationsService $appTranslationsService */
-        $appTranslationsService = AppService::instance()->getService(AppTranslationsService::class);
+        $appTranslationsService = DDDService::instance()->getService(AppTranslationsService::class);
         $appTranslationsService->translateAppTranslationsTexts($this, $async);
     }
 

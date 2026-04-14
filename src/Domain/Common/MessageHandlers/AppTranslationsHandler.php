@@ -4,14 +4,14 @@ declare (strict_types=1);
 
 namespace DDD\Domain\Common\MessageHandlers;
 
-use DDD\Domain\Base\Entities\MessageHandlers\CustomAppMessageHandler;
+use DDD\Domain\Base\Entities\MessageHandlers\AppMessageHandler;
 use DDD\Domain\Common\Services\AppTranslations\AppTranslationsService;
-use DDD\Infrastructure\Services\AppService;
+use DDD\Infrastructure\Services\DDDService;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Throwable;
 
 #[AsMessageHandler(fromTransport: 'app_translations')]
-class AppTranslationsHandler extends CustomAppMessageHandler
+class AppTranslationsHandler extends AppMessageHandler
 {
     public function __invoke(AppTranslationsMessage $appMessage)
     {
@@ -20,7 +20,7 @@ class AppTranslationsHandler extends CustomAppMessageHandler
             return;
         }
         /** @var AppTranslationsService $appTranslationsService */
-        $appTranslationsService = AppService::instance()->getService(AppTranslationsService::class);
+        $appTranslationsService = DDDService::instance()->getService(AppTranslationsService::class);
         try {
             $this->getLogger()->info(
                 "Performing AppTranslations for {$appMessage->texts->count()} texts."

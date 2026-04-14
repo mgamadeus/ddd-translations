@@ -6,7 +6,7 @@ namespace DDD\Domain\Common\Services\AppTranslations;
 
 use DDD\Domain\AI\Entities\Prompts\AIPrompt;
 use DDD\Domain\AI\Services\AIModelsService;
-use DDD\Domain\Common\TranslationPrompts;
+use DDD\Domain\Common\Entities\Texts\TranslationPrompts;
 use DDD\Domain\AI\Services\AIPromptsService;
 use DDD\Domain\Base\Repo\Argus\Attributes\ArgusLoad;
 use DDD\Domain\Base\Repo\Argus\Utils\ArgusApiOperations;
@@ -27,13 +27,12 @@ use DDD\Domain\Common\Repo\Argus\Texts\ArgusTexts;
 use DDD\Domain\Common\Repo\Argus\Texts\Translations\ArgusTranslations;
 use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationDefaultTerms;
 use DDD\Domain\Common\Services\LanguagesService;
-use DDD\Domain\Seo\Repo\Argus\Domains\DomainContent\ArgusCompanyObjectiveSummary;
-use DDD\Infrastructure\Services\AppService;
 use DDD\Infrastructure\Exceptions\BadRequestException;
 use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Exceptions\NotFoundException;
 use DDD\Infrastructure\Libs\Config;
 use DDD\Infrastructure\Libs\Datafilter;
+use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Services\Service;
 use Psr\Cache\InvalidArgumentException;
 use ReflectionException;
@@ -48,7 +47,7 @@ class AppTranslationsService extends Service
     public function findMostOftenUsedWordsInAppTranslationKeys(): array
     {
         /** @var AppTranslationKeysService $appTranslationKeysService */
-        $appTranslationKeysService = AppService::instance()->getService(AppTranslationKeysService::class);
+        $appTranslationKeysService = DDDService::instance()->getService(AppTranslationKeysService::class);
         $appTranslationKeys = $appTranslationKeysService->findAll();
         $mostOftenUsedWords = [];
         $commonWords = Config::get('Common.AppTranslations.commonWords');
@@ -109,7 +108,7 @@ class AppTranslationsService extends Service
         ?string $writingStyle = null,
     ): AppTranslationKeys {
         /** @var AppTranslationKeysService $appTranslationKeysService */
-        $appTranslationKeysService = AppService::instance()->getService(AppTranslationKeysService::class);
+        $appTranslationKeysService = DDDService::instance()->getService(AppTranslationKeysService::class);
 
         $untranslatedKeys = $appTranslationKeysService->findUntranslatedKeysForLanguageId(
             $languageId,
@@ -139,7 +138,7 @@ class AppTranslationsService extends Service
     public function findTranslationKeysUsingTranslationTemplates(): AppTranslationKeys
     {
         /** @var AppTranslationKeysService $appTranslationKeysService */
-        $appTranslationKeysService = AppService::instance()->getService(AppTranslationKeysService::class);
+        $appTranslationKeysService = DDDService::instance()->getService(AppTranslationKeysService::class);
         return $appTranslationKeysService->findKeysUsingTranslationTemplates();
     }
 
@@ -170,7 +169,7 @@ class AppTranslationsService extends Service
         ini_set('memory_limit', '2000M');
 
         /** @var LanguagesService $languagesService */
-        $languagesService = AppService::instance()->getService(LanguagesService::class);
+        $languagesService = DDDService::instance()->getService(LanguagesService::class);
 
         $languages = $languagesService->findActiveLanguages(
             languageCodesToFilterFor: $languageCodesToFilterFor
@@ -220,7 +219,7 @@ class AppTranslationsService extends Service
     public function generateEnglishTranslationsFromKeys(): AppTranslationKeys
     {
         /** @var LanguagesService $languagesService */
-        $languagesService = AppService::instance()->getService(LanguagesService::class);
+        $languagesService = DDDService::instance()->getService(LanguagesService::class);
         $englishLanguage = $languagesService->findByLanguageCode('en');
 
         $untranslatedKeys = $this->findUntranslatedKeysForLanguage($englishLanguage->id, 10000);
@@ -274,7 +273,7 @@ class AppTranslationsService extends Service
         }
         $aiPromptName = $writingStyle == Text::WRITING_STYLE_INFORMAL ? TranslationPrompts::APP_TRANSLATIONS_SINGLE_LOCALE_INFORMAL : TranslationPrompts::APP_TRANSLATIONS_SINGLE_LOCALE_FORMAL;
         /** @var AIPromptsService $aiPromptsService */
-        $aiPromptsService = AppService::instance()->getService(AIPromptsService::class);
+        $aiPromptsService = DDDService::instance()->getService(AIPromptsService::class);
         $translationsAIPrompt = $aiPromptsService->getAIPromptByName($aiPromptName);
         $translationsAIPrompt->setParameter('default_locale', $locale->languageCode . '-' . $locale->countryShortCode);
         $translationsAIPrompt->setParameter(
@@ -386,10 +385,7 @@ class AppTranslationsService extends Service
         }
         set_time_limit(3600);
         ini_set('memory_limit', '2000M');
-        $defaultAdminAccount = AppService::instance()->getDefaultAccountForCliOperations();
-        ArgusCompanyObjectiveSummary::setDefaultAccountOrLocationForAiBudgetHandling(
-            account: $defaultAdminAccount
-        );
+        $defaultAdminAccount = DDDService::instance()->getDefaultAccountForCliOperations();
         $argusTexts = new ArgusTexts();
         $argusTexts->fromEntity($texts);
         $argusTexts->getTranslations();
@@ -421,8 +417,8 @@ class AppTranslationsService extends Service
             $appTranslationValue->appTranslationKey->reTranslate = false;
             $appTranslationValue->appTranslationKey->update();
         }
-        AppService::instance()->getLogger()->info('Operations executed: ' . json_encode(ArgusApiOperations::getExecutedArgusCalls()));
-        AppService::instance()->getLogger()->info('Translations created: ' . json_encode($appTranslationIds));
+        DDDService::instance()->getLogger()->info('Operations executed: ' . json_encode(ArgusApiOperations::getExecutedArgusCalls()));
+        DDDService::instance()->getLogger()->info('Translations created: ' . json_encode($appTranslationIds));
     }
 
     /**
@@ -446,7 +442,7 @@ class AppTranslationsService extends Service
     ): ?AppTranslationKeys {
         if (!$preferredCountryShortCode) {
             /** @var LanguagesService $languagesService */
-            $languagesService = AppService::instance()->getService(LanguagesService::class);
+            $languagesService = DDDService::instance()->getService(LanguagesService::class);
             $language = $languagesService->find($languageId);
             if (!$language) {
                 return null;
@@ -456,7 +452,7 @@ class AppTranslationsService extends Service
         }
 
         /** @var AppTranslationValuesService $appTranslationValuesService */
-        $appTranslationValuesService = AppService::instance()->getService(AppTranslationValuesService::class);
+        $appTranslationValuesService = DDDService::instance()->getService(AppTranslationValuesService::class);
         $appTranslationValuesForKeyStrings = $appTranslationValuesService->findByLanguageIdAndKeyStrings(
             $languageId,
             $keyStrings,
@@ -493,7 +489,7 @@ class AppTranslationsService extends Service
         int $languageId,
     ): ?AppTranslationValues {
         /** @var AppTranslationValuesService $appTranslationValuesService */
-        $appTranslationValuesService = AppService::instance()->getService(AppTranslationValuesService::class);
+        $appTranslationValuesService = DDDService::instance()->getService(AppTranslationValuesService::class);
         return $appTranslationValuesService->findByLanguageIdAndKeyStrings(
             $languageId,
             [$keyString],
@@ -512,10 +508,10 @@ class AppTranslationsService extends Service
         $removedAppTranslationValues = new AppTranslationValues();
 
         /** @var AppTranslationKeysService $appTranslationKeysService */
-        $appTranslationKeysService = AppService::instance()->getService(AppTranslationKeysService::class);
+        $appTranslationKeysService = DDDService::instance()->getService(AppTranslationKeysService::class);
 
         /** @var AppTranslationValuesService $appTranslationValuesService */
-        $appTranslationValuesService = AppService::instance()->getService(AppTranslationValuesService::class);
+        $appTranslationValuesService = DDDService::instance()->getService(AppTranslationValuesService::class);
 
         $keysRepoClass = $appTranslationKeysService->getEntitySetRepoClassInstance();
         $queryBuilder = $keysRepoClass::createQueryBuilder();

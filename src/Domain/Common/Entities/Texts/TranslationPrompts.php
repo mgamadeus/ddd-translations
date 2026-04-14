@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace DDD\Domain\Common;
+namespace DDD\Domain\Common\Entities\Texts;
 
 /**
  * Prompt name constants for the Translations module.
