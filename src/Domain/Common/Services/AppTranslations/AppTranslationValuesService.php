@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace DDD\Domain\Common\Services\AppTranslations;
 
-use DDD\Domain\Common\Entities\AppTranslations\AppTranslationValue;
-use DDD\Domain\Common\Entities\AppTranslations\AppTranslationValues;
-use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationValue;
-use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationValues;
 use DDD\Domain\Base\Entities\DefaultObject;
 use DDD\Domain\Base\Services\EntitiesService;
+use DDD\Domain\Common\Entities\AppTranslations\AppTranslationValue;
+use DDD\Domain\Common\Entities\AppTranslations\AppTranslationValues;
+use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationKey;
+use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationValue;
+use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationValues;
 
 /**
  * Service for managing AppTranslationValue entities
@@ -43,7 +44,7 @@ class AppTranslationValuesService extends EntitiesService
         $queryBuilder->setParameter('languageId', $languageId);
 
         // Join with keys table to filter by key strings
-        $keyOrmModel = \DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationKey::BASE_ORM_MODEL;
+        $keyOrmModel = DBAppTranslationKey::BASE_ORM_MODEL;
         $queryBuilder->innerJoin(
             $keyOrmModel,
             'atk',
@@ -105,6 +106,103 @@ class AppTranslationValuesService extends EntitiesService
         if (!empty($orConditions)) {
             $queryBuilder->andWhere('(' . implode(' OR ', $orConditions) . ')');
         }
+
+        return $repoClass->find($queryBuilder);
+    }
+
+    /**
+     * Find a single AppTranslationValue by key ID, language ID, and writing style
+     *
+     * @param int $appTranslationKeyId The translation key ID
+     * @param int $languageId The language ID
+     * @param string $writingStyle The writing style (FORMAL or INFORMAL)
+     * @return AppTranslationValue|null
+     */
+    public function findByKeyLanguageAndWritingStyle(
+        int $appTranslationKeyId,
+        int $languageId,
+        string $writingStyle
+    ): ?AppTranslationValue {
+        return $this->findValue($appTranslationKeyId, $languageId, $writingStyle);
+    }
+
+    /**
+     * Find a single AppTranslationValue with optional countryId filtering.
+     *
+     * @param int $appTranslationKeyId
+     * @param int $languageId
+     * @param string $writingStyle
+     * @param int|null $countryId If provided, filters by countryId; if null, filters for countryId IS NULL (or 0 via virtual column)
+     * @return AppTranslationValue|null
+     */
+    public function findValue(
+        int $appTranslationKeyId,
+        int $languageId,
+        string $writingStyle,
+        ?int $countryId = null
+    ): ?AppTranslationValue {
+        $repoClass = $this->getEntityRepoClassInstance();
+        $queryBuilder = $repoClass::createQueryBuilder();
+        $a = $repoClass::getBaseModelAlias();
+
+        $queryBuilder->andWhere("{$a}.appTranslationKeyId = :keyId");
+        $queryBuilder->andWhere("{$a}.languageId = :languageId");
+        $queryBuilder->andWhere("{$a}.writingStyle = :writingStyle");
+        $queryBuilder->setParameter('keyId', $appTranslationKeyId);
+        $queryBuilder->setParameter('languageId', $languageId);
+        $queryBuilder->setParameter('writingStyle', $writingStyle);
+
+        if ($countryId !== null) {
+            $queryBuilder->andWhere("{$a}.countryId = :countryId");
+            $queryBuilder->setParameter('countryId', $countryId);
+        } else {
+            $queryBuilder->andWhere("({$a}.countryId IS NULL OR {$a}.countryId = 0)");
+        }
+
+        return $repoClass->find($queryBuilder);
+    }
+
+    /**
+     * Find the first AppTranslationValue for a key + language, regardless of writingStyle/country.
+     * Used as a last-resort native-value fallback.
+     *
+     * @param int $appTranslationKeyId
+     * @param int $languageId
+     * @return AppTranslationValue|null
+     */
+    public function findAnyValueForKeyAndLanguage(
+        int $appTranslationKeyId,
+        int $languageId
+    ): ?AppTranslationValue {
+        $repoClass = $this->getEntityRepoClassInstance();
+        $queryBuilder = $repoClass::createQueryBuilder();
+        $a = $repoClass::getBaseModelAlias();
+
+        $queryBuilder->andWhere("{$a}.appTranslationKeyId = :keyId");
+        $queryBuilder->andWhere("{$a}.languageId = :languageId");
+        $queryBuilder->setParameter('keyId', $appTranslationKeyId);
+        $queryBuilder->setParameter('languageId', $languageId);
+        $queryBuilder->setMaxResults(1);
+
+        return $repoClass->find($queryBuilder);
+    }
+
+    /**
+     * Find the first AppTranslationValue for a key, regardless of language/writingStyle/country.
+     * Used as a last-resort native-value fallback.
+     *
+     * @param int $appTranslationKeyId
+     * @return AppTranslationValue|null
+     */
+    public function findFirstValueForKey(int $appTranslationKeyId): ?AppTranslationValue
+    {
+        $repoClass = $this->getEntityRepoClassInstance();
+        $queryBuilder = $repoClass::createQueryBuilder();
+        $a = $repoClass::getBaseModelAlias();
+
+        $queryBuilder->andWhere("{$a}.appTranslationKeyId = :keyId");
+        $queryBuilder->setParameter('keyId', $appTranslationKeyId);
+        $queryBuilder->setMaxResults(1);
 
         return $repoClass->find($queryBuilder);
     }
