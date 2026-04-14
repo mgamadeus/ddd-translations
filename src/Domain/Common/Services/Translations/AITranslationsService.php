@@ -1,6 +1,6 @@
 <?php
 
-namespace DDD\Domain\Common\Services;
+namespace DDD\Domain\Common\Services\Translations;
 
 use DDD\Domain\AI\Entities\Prompts\AIPrompt;
 use DDD\Domain\AI\Services\AIPromptsService;

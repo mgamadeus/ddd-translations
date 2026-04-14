@@ -43,6 +43,21 @@ $result = $service->generateAppTranslationsForLocale($locale, writingStyle: 'FOR
 $results = $service->generateAppTranslationsForActiveLocales();
 ```
 
+## Service registration
+
+Add to your project's `services.yaml`:
+
+```yaml
+# DDD Module: ddd-common-translations
+DDD\Domain\Common\Services\AppTranslations\:
+    resource: '%kernel.project_dir%/vendor/mgamadeus/ddd-common-translations/src/Domain/Common/Services/AppTranslations/*'
+    public: true
+
+DDD\Domain\Common\Services\Translations\:
+    resource: '%kernel.project_dir%/vendor/mgamadeus/ddd-common-translations/src/Domain/Common/Services/Translations/*'
+    public: true
+```
+
 ### Text processing
 
 - **Text / Texts** — base text entities with locale, writing style, context
