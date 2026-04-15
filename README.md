@@ -58,6 +58,21 @@ DDD\Domain\Common\Services\Translations\:
     public: true
 ```
 
+## AppTranslatableService (DB-backed translations, optional)
+
+By default, the DDD core's `TranslatableService::translateKey()` reads from `config/app/Common/Translations.php` (hardcoded translations array). The module ships `AppTranslatableService` which overrides `translateKey()` to read from `AppTranslationKey` + `AppTranslationValue` entities in the database — letting you manage translations via admin UI instead of code.
+
+To activate, override the core service in your `services.yaml`:
+
+```yaml
+# Use DB-backed translations instead of config array
+DDD\Domain\Base\Services\TranslatableService:
+    class: DDD\Domain\Common\Services\Translations\AppTranslatableService
+    public: true
+```
+
+The fallback chain is identical to the core (language+country+style → no country → alt writing style → default language → first available → key itself), just sourced from the DB with APC caching at each step (1-hour TTL).
+
 ### Text processing
 
 - **Text / Texts** — base text entities with locale, writing style, context
