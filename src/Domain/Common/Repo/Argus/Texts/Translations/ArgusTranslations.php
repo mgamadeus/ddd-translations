@@ -28,8 +28,9 @@ use DDD\Domain\Common\Entities\Texts\Translations\Translations;
  */
 #[ArgusLoad(loadEndpoint: 'POST:/ai/openRouter/chatCompletions', cacheLevel: ArgusCache::CACHELEVEL_MEMORY_AND_DB, cacheTtl: ArgusCache::CACHELEVEL_NONE)]
 #[ArgusLanguageModel(
-    defaultAIModelName: AIModel::MODEL_OPENAI_GPT5_2,
+    defaultAIModelName: AIModel::MODEL_OPENAI_GPT5_4_MINI,
     defaultAIPromptName: TranslationPrompts::APP_TRANSLATIONS_SINGLE_LOCALE_FORMAL,
+    responseFormat: ArgusLanguageModel::RESPONSE_FORMAT_JSON_OBJECT,
 )]
 class ArgusTranslations extends Translations
 {
@@ -87,20 +88,41 @@ class ArgusTranslations extends Translations
             $decodedResult = json_decode($resultText);
         }
         if (!$decodedResult) {
+            $locale = $this->localesToTranslateAtOnce->first();
+            $localeStr = $locale ? ((string)$locale->languageCode . '-' . $locale->countryShortCode) : 'unknown';
+            error_log("[ArgusTranslations] applyLoadResult failed for locale {$localeStr}: "
+                . ($resultText ? 'json_decode error: ' . json_last_error_msg() : 'empty result'));
             return;
         }
-        $translations = $decodedResult;
         $locale = $this->localesToTranslateAtOnce->first();
         $defaultWritingStyle = $this->getParent()->defaultWritingStyle;
-        foreach ($translations as $translation) {
-            $argusTranslation = new ArgusTranslation(
-                externalId: $translation[0],
-                content: $translation[1],
-                locale: $locale,
-                writingStyle: $defaultWritingStyle,
-                context: Text::CONTEXT_ONE
-            );
-            $this->add($argusTranslation);
+
+        // Normalize: the model may return either the expected array-of-arrays
+        // [[id, text], ...] or a JSON object {id: text, ...} (common with json_object response format).
+        $isObject = is_object($decodedResult) || (is_array($decodedResult) && !array_is_list($decodedResult));
+        if ($isObject) {
+            $pairs = (array)$decodedResult;
+            foreach ($pairs as $externalId => $content) {
+                $argusTranslation = new ArgusTranslation(
+                    externalId: (string)$externalId,
+                    content: (string)$content,
+                    locale: $locale,
+                    writingStyle: $defaultWritingStyle,
+                    context: Text::CONTEXT_ONE
+                );
+                $this->add($argusTranslation);
+            }
+        } else {
+            foreach ($decodedResult as $translation) {
+                $argusTranslation = new ArgusTranslation(
+                    externalId: $translation[0],
+                    content: $translation[1],
+                    locale: $locale,
+                    writingStyle: $defaultWritingStyle,
+                    context: Text::CONTEXT_ONE
+                );
+                $this->add($argusTranslation);
+            }
         }
     }
 }

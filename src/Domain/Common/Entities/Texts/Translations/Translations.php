@@ -26,7 +26,7 @@ use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 class Translations extends Texts
 {
     /** @var string Default model used for Translations */
-    public const string AI_MODEL_FOR_TRANSLATIONS = AIModel::MODEL_OPENAI_GPT5_2;
+    public const string AI_MODEL_FOR_TRANSLATIONS = AIModel::MODEL_OPENAI_GPT5_4_MINI;
 
     /** @var Locales The locales to be translated at once in a batch */
     public Locales $localesToTranslateAtOnce;
