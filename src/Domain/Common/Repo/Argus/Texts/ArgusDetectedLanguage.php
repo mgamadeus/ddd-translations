@@ -25,7 +25,7 @@ use DDD\Domain\Base\Entities\LazyLoad\LazyLoad;
  */
 #[ArgusLoad(loadEndpoint: 'POST:/ai/openRouter/chatCompletions', cacheLevel: ArgusCache::CACHELEVEL_MEMORY_AND_DB, cacheTtl: ArgusCache::CACHELEVEL_NONE)]
 #[ArgusLanguageModel(
-    defaultAIModelName: AIModel::MODEL_OPENAI_GPT5_NANO,
+    defaultAIModelName: AIModel::MODEL_OPENAI_GPT5_4_MINI,
     defaultAIPromptName: TranslationPrompts::DETECTED_LANGUAGE,
     temperature: 0,
     responseFormat: ArgusLanguageModel::RESPONSE_FORMAT_JSON_OBJECT
