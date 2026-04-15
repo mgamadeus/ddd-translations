@@ -91,6 +91,8 @@ class Text extends ValueObject
         $this->writingStyle = $writingStyle;
         $this->externalId = $externalId;
         $this->requiresContext = $requiresContext;
+        $this->translationHint = $translationHint;
+        $this->context = $context;
     }
 
     public function getTranslationForLocale(

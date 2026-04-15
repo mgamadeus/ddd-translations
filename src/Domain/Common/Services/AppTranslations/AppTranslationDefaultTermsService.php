@@ -12,7 +12,7 @@ use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationDefaultTerm;
 use DDD\Domain\Common\Repo\DB\AppTranslations\DBAppTranslationDefaultTerms;
 use DDD\Domain\Base\Entities\DefaultObject;
 use DDD\Domain\Base\Services\EntitiesService;
-use DDD\Domain\Common\Services\LanguagesService;
+use DDD\Domain\Common\Services\Languages\LanguagesService;
 
 /**
  * Service for managing AppTranslationDefaultTerm entities
