@@ -20,7 +20,7 @@ class DBAppTranslationDefaultTermModel extends DoctrineModel
 
 	public const string TABLE_NAME = 'AppTranslationDefaultTerms';
 
-	public const string ENTITY_CLASS = 'App\Domain\Common\Entities\AppTranslations\AppTranslationDefaultTerm';
+	public const string ENTITY_CLASS = 'DDD\Domain\Common\Entities\AppTranslations\AppTranslationDefaultTerm';
 
 	#[ORM\Column(type: 'integer')]
 	public ?int $languageId;

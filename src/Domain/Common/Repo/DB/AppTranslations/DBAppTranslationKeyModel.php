@@ -19,7 +19,7 @@ class DBAppTranslationKeyModel extends DoctrineModel
 
 	public const string TABLE_NAME = 'AppTranslationKeys';
 
-	public const string ENTITY_CLASS = 'App\Domain\Common\Entities\AppTranslations\AppTranslationKey';
+	public const string ENTITY_CLASS = 'DDD\Domain\Common\Entities\AppTranslations\AppTranslationKey';
 
 	#[ORM\Column(type: 'string')]
 	public ?string $key;

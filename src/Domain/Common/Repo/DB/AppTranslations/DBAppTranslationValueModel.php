@@ -19,7 +19,7 @@ class DBAppTranslationValueModel extends DoctrineModel
 
     public const string TABLE_NAME = 'AppTranslationValues';
 
-    public const string ENTITY_CLASS = 'App\Domain\Common\Entities\AppTranslations\AppTranslationValue';
+    public const string ENTITY_CLASS = 'DDD\Domain\Common\Entities\AppTranslations\AppTranslationValue';
 
     public static array $virtualColumns = [
         'virtualCountryId' => [
