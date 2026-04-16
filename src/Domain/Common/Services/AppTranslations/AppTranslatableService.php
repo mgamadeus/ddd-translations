@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace DDD\Domain\Common\Services\Translations;
+namespace DDD\Domain\Common\Services\AppTranslations;
 
 use DDD\Domain\Base\Entities\Translatable\Translatable;
 use DDD\Domain\Base\Services\TranslatableService;
@@ -10,8 +10,6 @@ use DDD\Domain\Common\Entities\AppTranslations\AppTranslationKey;
 use DDD\Domain\Common\Entities\AppTranslations\AppTranslationValue;
 use DDD\Domain\Common\Entities\Languages\Language;
 use DDD\Domain\Common\Entities\PoliticalEntities\Countries\Country;
-use DDD\Domain\Common\Services\AppTranslations\AppTranslationKeysService;
-use DDD\Domain\Common\Services\AppTranslations\AppTranslationValuesService;
 use DDD\Domain\Common\Services\Languages\LanguagesService;
 use DDD\Domain\Common\Services\PoliticalEntities\CountriesService;
 use DDD\Infrastructure\Cache\Cache;
