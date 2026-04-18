@@ -28,6 +28,12 @@ class ArgusTextEmbedding extends TextEmbedding
 {
     use ArgusTrait;
 
+    public const string MODEL_SMALL = 'text-embedding-3-small';
+    public const string MODEL_LARGE = 'text-embedding-3-large';
+
+    /** @var string The embedding model to use for the next generation call */
+    public static string $model = self::MODEL_SMALL;
+
     /**
      * @param Text $text
      * @param LazyLoad $lazyloadAttributeInstance
@@ -65,7 +71,7 @@ class ArgusTextEmbedding extends TextEmbedding
     {
         return [
             'body' => [
-                'model' => 'text-embedding-3-small',
+                'model' => static::$model,
                 'input' => $this->getParent()->content,
             ]
         ];
