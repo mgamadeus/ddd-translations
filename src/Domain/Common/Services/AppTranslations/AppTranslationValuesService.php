@@ -40,7 +40,7 @@ class AppTranslationValuesService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$baseModelAlias}.languageId = :languageId");
+        $queryBuilder->andWhere("$baseModelAlias.languageId = :languageId");
         $queryBuilder->setParameter('languageId', $languageId);
 
         // Join with keys table to filter by key strings
@@ -49,7 +49,7 @@ class AppTranslationValuesService extends EntitiesService
             $keyOrmModel,
             'atk',
             'WITH',
-            "atk.id = {$baseModelAlias}.appTranslationKeyId AND atk.key IN (:keyStrings)"
+            "atk.id = $baseModelAlias.appTranslationKeyId AND atk.key IN (:keyStrings)"
         );
         $queryBuilder->setParameter('keyStrings', $keyStrings);
 
@@ -71,8 +71,8 @@ class AppTranslationValuesService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$baseModelAlias}.languageId = :languageId");
-        $queryBuilder->andWhere("{$baseModelAlias}.appTranslationKeyId = :appTranslationKeyId");
+        $queryBuilder->andWhere("$baseModelAlias.languageId = :languageId");
+        $queryBuilder->andWhere("$baseModelAlias.appTranslationKeyId = :appTranslationKeyId");
         $queryBuilder->setParameter('languageId', $languageId);
         $queryBuilder->setParameter('appTranslationKeyId', $appTranslationKeyId);
 
@@ -94,14 +94,14 @@ class AppTranslationValuesService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$baseModelAlias}.languageId = :languageId");
+        $queryBuilder->andWhere("$baseModelAlias.languageId = :languageId");
         $queryBuilder->setParameter('languageId', $languageId);
 
         $orConditions = [];
         foreach ($terms as $index => $term) {
-            $paramName = "term_{$index}";
-            $orConditions[] = "{$baseModelAlias}.translation LIKE :{$paramName}";
-            $queryBuilder->setParameter($paramName, "%{$term}%");
+            $paramName = "term_$index";
+            $orConditions[] = "$baseModelAlias.translation LIKE :$paramName";
+            $queryBuilder->setParameter($paramName, "%$term%");
         }
         if (!empty($orConditions)) {
             $queryBuilder->andWhere('(' . implode(' OR ', $orConditions) . ')');
@@ -145,18 +145,18 @@ class AppTranslationValuesService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $a = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$a}.appTranslationKeyId = :keyId");
-        $queryBuilder->andWhere("{$a}.languageId = :languageId");
-        $queryBuilder->andWhere("{$a}.writingStyle = :writingStyle");
+        $queryBuilder->andWhere("$a.appTranslationKeyId = :keyId");
+        $queryBuilder->andWhere("$a.languageId = :languageId");
+        $queryBuilder->andWhere("$a.writingStyle = :writingStyle");
         $queryBuilder->setParameter('keyId', $appTranslationKeyId);
         $queryBuilder->setParameter('languageId', $languageId);
         $queryBuilder->setParameter('writingStyle', $writingStyle);
 
         if ($countryId !== null) {
-            $queryBuilder->andWhere("{$a}.countryId = :countryId");
+            $queryBuilder->andWhere("$a.countryId = :countryId");
             $queryBuilder->setParameter('countryId', $countryId);
         } else {
-            $queryBuilder->andWhere("({$a}.countryId IS NULL OR {$a}.countryId = 0)");
+            $queryBuilder->andWhere("($a.countryId IS NULL OR $a.countryId = 0)");
         }
 
         return $repoClass->find($queryBuilder);
@@ -178,8 +178,8 @@ class AppTranslationValuesService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $a = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$a}.appTranslationKeyId = :keyId");
-        $queryBuilder->andWhere("{$a}.languageId = :languageId");
+        $queryBuilder->andWhere("$a.appTranslationKeyId = :keyId");
+        $queryBuilder->andWhere("$a.languageId = :languageId");
         $queryBuilder->setParameter('keyId', $appTranslationKeyId);
         $queryBuilder->setParameter('languageId', $languageId);
         $queryBuilder->setMaxResults(1);
@@ -200,7 +200,7 @@ class AppTranslationValuesService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $a = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$a}.appTranslationKeyId = :keyId");
+        $queryBuilder->andWhere("$a.appTranslationKeyId = :keyId");
         $queryBuilder->setParameter('keyId', $appTranslationKeyId);
         $queryBuilder->setMaxResults(1);
 

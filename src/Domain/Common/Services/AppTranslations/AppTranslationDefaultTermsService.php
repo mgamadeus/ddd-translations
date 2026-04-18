@@ -50,7 +50,7 @@ class AppTranslationDefaultTermsService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$baseModelAlias}.languageId = :languageId");
+        $queryBuilder->andWhere("$baseModelAlias.languageId = :languageId");
         $queryBuilder->setParameter('languageId', $languageId);
 
         return $repoClass->find($queryBuilder);

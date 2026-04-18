@@ -81,7 +81,7 @@ class AppTranslationsService extends Service
         $dbAppTranslationDefaultTerms = new DBAppTranslationDefaultTerms();
         $queryBuilder = $dbAppTranslationDefaultTerms::createQueryBuilder();
         $baseModelAlias = $dbAppTranslationDefaultTerms::getBaseModelAlias();
-        $queryBuilder->andWhere("{$baseModelAlias}.languageId = :languageId");
+        $queryBuilder->andWhere("$baseModelAlias.languageId = :languageId");
         $queryBuilder->setParameter('languageId', $languageId);
 
         return $dbAppTranslationDefaultTerms->find($queryBuilder) ?? new AppTranslationDefaultTerms();
@@ -339,7 +339,7 @@ class AppTranslationsService extends Service
                 language: 'en',
                 externalId: $translationKey->id,
                 requiresContext: $translationKey->requiresContext ?? false,
-                translationHint: isset($translationKey->translationHint) ? $translationKey->translationHint : null
+                translationHint: $translationKey->translationHint ?? null
             );
             $texts->add($text);
         }
@@ -524,11 +524,11 @@ class AppTranslationsService extends Service
 
         // Find all AppTranslationKeys that contain duplicate values for property combinations
         $queryBuilder->andWhere(
-            "{$keysModelAlias}.id IN (
-            SELECT {$valuesModelAlias}.appTranslationKeyId
-            FROM {$valuesOrmModel} {$valuesModelAlias}
-            GROUP BY {$valuesModelAlias}.appTranslationKeyId, {$valuesModelAlias}.writingStyle, {$valuesModelAlias}.context, {$valuesModelAlias}.languageId, {$valuesModelAlias}.countryId
-            HAVING COUNT({$valuesModelAlias}.id) > 1
+            "$keysModelAlias.id IN (
+            SELECT $valuesModelAlias.appTranslationKeyId
+            FROM $valuesOrmModel $valuesModelAlias
+            GROUP BY $valuesModelAlias.appTranslationKeyId, $valuesModelAlias.writingStyle, $valuesModelAlias.context, $valuesModelAlias.languageId, $valuesModelAlias.countryId
+            HAVING COUNT($valuesModelAlias.id) > 1
         )"
         );
 
@@ -539,9 +539,9 @@ class AppTranslationsService extends Service
             $queryBuilderValues = $valuesSetRepoClass::createQueryBuilder();
             $valuesSetModelAlias = $valuesSetRepoClass::getBaseModelAlias();
             $queryBuilderValues->andWhere(
-                "{$valuesSetModelAlias}.appTranslationKeyId = :appTranslationKeyId"
+                "$valuesSetModelAlias.appTranslationKeyId = :appTranslationKeyId"
             );
-            $queryBuilderValues->orderBy("{$valuesSetModelAlias}.created", 'asc');
+            $queryBuilderValues->orderBy("$valuesSetModelAlias.created", 'asc');
             $queryBuilderValues->setParameter('appTranslationKeyId', $appTranslationKeyWithDuplicates->id);
             $potentialDuplicateValues = $valuesSetRepoClass->find($queryBuilderValues);
 

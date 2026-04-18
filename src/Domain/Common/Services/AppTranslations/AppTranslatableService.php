@@ -114,7 +114,7 @@ class AppTranslatableService extends TranslatableService
 
         // 5. Native value fallback (first available for this key)
         if ($this->fallbackToNativeValueIfNoTranslationIsPresent()) {
-            $cacheKey = "appTranslationValue_first_{$keyId}";
+            $cacheKey = "appTranslationValue_first_$keyId";
             $cached = Cache::instance()->get($cacheKey);
             if ($cached !== false) {
                 // cached hit: null = known miss, string = translation

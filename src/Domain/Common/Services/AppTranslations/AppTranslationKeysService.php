@@ -49,7 +49,7 @@ class AppTranslationKeysService extends EntitiesService
         $repoClass = $this->getEntitySetRepoClassInstance();
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
-        $queryBuilder->andWhere("{$baseModelAlias}.key IN (:keyStrings)");
+        $queryBuilder->andWhere("$baseModelAlias.key IN (:keyStrings)");
         $queryBuilder->setParameter('keyStrings', $keyStrings);
 
         return $repoClass->find($queryBuilder);
@@ -81,23 +81,23 @@ class AppTranslationKeysService extends EntitiesService
 
         // Build subquery to find keys that already have translations
         $valueOrmModel = DBAppTranslationValue::BASE_ORM_MODEL;
-        $subQuery = "SELECT atvSub.appTranslationKeyId FROM {$valueOrmModel} atvSub WHERE atvSub.languageId = :languageId";
+        $subQuery = "SELECT atvSub.appTranslationKeyId FROM $valueOrmModel atvSub WHERE atvSub.languageId = :languageId";
 
         if ($writingStyle) {
             $subQuery .= ' AND atvSub.writingStyle = :writingStyle';
             $queryBuilder->setParameter('writingStyle', $writingStyle);
         }
 
-        $queryBuilder->andWhere("{$baseModelAlias}.id NOT IN ({$subQuery})");
+        $queryBuilder->andWhere("$baseModelAlias.id NOT IN ($subQuery)");
         $queryBuilder->setParameter('languageId', $languageId);
 
         if ($ignoreKeysThatShouldNotBeTranslatedAutomatically) {
-            $queryBuilder->andWhere("{$baseModelAlias}.doNotTranslateAutomatically = :doNotTranslate");
+            $queryBuilder->andWhere("$baseModelAlias.doNotTranslateAutomatically = :doNotTranslate");
             $queryBuilder->setParameter('doNotTranslate', false);
         }
 
         if ($minAppTranslationKeyId) {
-            $queryBuilder->andWhere("{$baseModelAlias}.id >= :minId");
+            $queryBuilder->andWhere("$baseModelAlias.id >= :minId");
             $queryBuilder->setParameter('minId', $minAppTranslationKeyId);
         }
 
@@ -129,7 +129,7 @@ class AppTranslationKeysService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$baseModelAlias}.reTranslate = :reTranslate");
+        $queryBuilder->andWhere("$baseModelAlias.reTranslate = :reTranslate");
         $queryBuilder->setParameter('reTranslate', true);
 
         if ($limit) {
@@ -150,8 +150,8 @@ class AppTranslationKeysService extends EntitiesService
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
 
-        $queryBuilder->andWhere("{$baseModelAlias}.translationTemplate IS NOT NULL");
-        $queryBuilder->andWhere("{$baseModelAlias}.translationTemplate != :emptyString");
+        $queryBuilder->andWhere("$baseModelAlias.translationTemplate IS NOT NULL");
+        $queryBuilder->andWhere("$baseModelAlias.translationTemplate != :emptyString");
         $queryBuilder->setParameter('emptyString', '');
 
         return $repoClass->find($queryBuilder);
@@ -186,7 +186,7 @@ class AppTranslationKeysService extends EntitiesService
         $originalValuesQueryOptions = clone AppTranslationValues::getDefaultQueryOptions();
 
         foreach ($activeLocales->getElements() as $locale) {
-            $baseFilter = "languageId eq '{$locale->languageId}' AND virtualCountryId eq '0'";
+            $baseFilter = "languageId eq '$locale->languageId' AND virtualCountryId eq '0'";
 
             // Count informal translations
             $informalFilter = FiltersOptions::fromString(
@@ -269,7 +269,7 @@ class AppTranslationKeysService extends EntitiesService
                     $appTranslationKey = $this->update($appTranslationKey);
                     $keysCreated++;
                 } catch (Throwable $t) {
-                    $errors[] = "Failed to create key '{$keyString}': " . $t->getMessage();
+                    $errors[] = "Failed to create key '$keyString': " . $t->getMessage();
                     continue;
                 }
             }
@@ -294,7 +294,7 @@ class AppTranslationKeysService extends EntitiesService
                 }
                 $languageId = $languageMap[$languageCode] ?? null;
                 if (!$languageId) {
-                    $errors[] = "Language not found for code '{$languageCode}' (key: '{$keyString}')";
+                    $errors[] = "Language not found for code '$languageCode' (key: '$keyString')";
                     continue;
                 }
 
@@ -321,7 +321,7 @@ class AppTranslationKeysService extends EntitiesService
                     $value->update();
                     $valuesCreated++;
                 } catch (Throwable $t) {
-                    $errors[] = "Failed to create value for key '{$keyString}', lang '{$languageCode}': " . $t->getMessage();
+                    $errors[] = "Failed to create value for key '$keyString', lang '$languageCode': " . $t->getMessage();
                 }
             }
         }
@@ -348,7 +348,7 @@ class AppTranslationKeysService extends EntitiesService
         $repoClass = $this->getEntityRepoClassInstance();
         $queryBuilder = $repoClass::createQueryBuilder();
         $baseModelAlias = $repoClass::getBaseModelAlias();
-        $queryBuilder->andWhere("{$baseModelAlias}.key = :keyString");
+        $queryBuilder->andWhere("$baseModelAlias.key = :keyString");
         $queryBuilder->setParameter('keyString', $keyString);
 
         return $repoClass->find($queryBuilder);

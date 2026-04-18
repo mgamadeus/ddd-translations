@@ -1,5 +1,5 @@
 ---
-name: translations-module-specialist
+name: ddd-module-translations-specialist
 description: Work with entity translations, app UI translations, text embeddings, and language detection from the ddd-common-translations module. Use when translating entity properties, managing app translation keys, generating translations via AI, or working with text embeddings.
 metadata:
   author: mgamadeus

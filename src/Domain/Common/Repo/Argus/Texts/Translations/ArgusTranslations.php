@@ -90,7 +90,7 @@ class ArgusTranslations extends Translations
         if (!$decodedResult) {
             $locale = $this->localesToTranslateAtOnce->first();
             $localeStr = $locale ? ((string)$locale->languageCode . '-' . $locale->countryShortCode) : 'unknown';
-            error_log("[ArgusTranslations] applyLoadResult failed for locale {$localeStr}: "
+            error_log("[ArgusTranslations] applyLoadResult failed for locale $localeStr: "
                 . ($resultText ? 'json_decode error: ' . json_last_error_msg() : 'empty result'));
             return;
         }

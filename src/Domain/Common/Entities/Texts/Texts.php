@@ -16,6 +16,7 @@ use DDD\Infrastructure\Exceptions\InternalErrorException;
 use DDD\Infrastructure\Services\DDDService;
 use DDD\Infrastructure\Validation\Constraints\Choice;
 use Override;
+use ReflectionException;
 
 /**
  * @property Text[] $elements;
@@ -93,7 +94,7 @@ class Texts extends ObjectSet
      * @param bool $async
      * @return void
      * @throws InternalErrorException
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
     public function translate(bool $async = true): void
     {
