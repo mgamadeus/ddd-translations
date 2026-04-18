@@ -8,6 +8,7 @@ use DDD\Domain\Base\Repo\Argus\Attributes\ArgusLoad;
 use DDD\Domain\Base\Repo\Argus\Traits\ArgusTrait;
 use DDD\Domain\Base\Repo\Argus\Utils\ArgusApiOperation;
 use DDD\Domain\Base\Repo\Argus\Utils\ArgusCache;
+use DDD\Domain\Common\Entities\MathEntities\Vector;
 use DDD\Domain\Common\Entities\Texts\Embeddings\TextEmbedding;
 use DDD\Domain\Common\Entities\Texts\Text;
 use DDD\Domain\Common\Repo\Argus\Texts\ArgusText;
@@ -28,11 +29,13 @@ class ArgusTextEmbedding extends TextEmbedding
 {
     use ArgusTrait;
 
-    public const string MODEL_SMALL = 'text-embedding-3-small';
-    public const string MODEL_LARGE = 'text-embedding-3-large';
+    protected const array DIMENSION_TO_MODEL = [
+        Vector::DIMENSION_OPENAI_EMBEDDING_SMALL => 'text-embedding-3-small',
+        Vector::DIMENSION_OPENAI_EMBEDDING_LARGE => 'text-embedding-3-large',
+    ];
 
-    /** @var string The embedding model to use for the next generation call */
-    public static string $model = self::MODEL_SMALL;
+    /** @var int Vector dimensions for the next embedding generation (use Vector::DIMENSION_* constants) */
+    public static int $dimensions = Vector::DIMENSION_OPENAI_EMBEDDING_SMALL;
 
     /**
      * @param Text $text
@@ -71,7 +74,7 @@ class ArgusTextEmbedding extends TextEmbedding
     {
         return [
             'body' => [
-                'model' => static::$model,
+                'model' => static::DIMENSION_TO_MODEL[static::$dimensions] ?? static::DIMENSION_TO_MODEL[Vector::DIMENSION_OPENAI_EMBEDDING_SMALL],
                 'input' => $this->getParent()->content,
             ]
         ];
