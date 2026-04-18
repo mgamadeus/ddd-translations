@@ -3,7 +3,7 @@
     "description": "Texts, entity translations, app translations, embeddings for mgamadeus/ddd",
     "minimum-stability": "stable",
     "license": "MIT",
-    "version": "1.0.16",
+    "version": "1.0.17",
     "authors": [
         {
             "name": "Marius-Eugen Gerdan",

@@ -6,7 +6,7 @@ Texts, entity translations, app UI translations, embeddings, and language detect
 **Namespace:** `DDD\`
 **Depends on:** `mgamadeus/ddd` (^2.10), `mgamadeus/ddd-ai` (^1.0), `mgamadeus/ddd-common-money` (^1.0), `mgamadeus/ddd-common-political` (^1.0)
 
-> **This module follows all DDD Core conventions.** For base patterns, see skills in `vendor/mgamadeus/ddd`. For AI patterns, see `vendor/mgamadeus/ddd-ai`. For Argus patterns, see `vendor/mgamadeus/ddd-argus`.
+> **This module follows all DDD Core conventions.** For base patterns, see `vendor/mgamadeus/ddd/AGENTS.md` and skills in `vendor/mgamadeus/ddd`. For AI patterns, see `vendor/mgamadeus/ddd-ai`. For Argus patterns, see `vendor/mgamadeus/ddd-argus`.
 
 ## Architecture
 
