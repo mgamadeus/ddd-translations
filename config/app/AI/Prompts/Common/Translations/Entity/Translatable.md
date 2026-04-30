@@ -83,7 +83,6 @@ Many entity properties are multi-line markdown (FAQs, articles, descriptions, co
 - Keep **blockquote markers** (`>`) at the start of the same lines.
 - Keep **fenced code blocks** (```` ``` ```` … ```` ``` ````) and their contents **completely untouched** — code is never translated.
 - Keep **link syntax** `[label](url)` — translate only `label`, never `url`.
-- Keep straight quotes straight and curly quotes curly — do not switch quote style.
 
 Example showing exact structural preservation:
 
@@ -107,6 +106,26 @@ Every `\n`, every `**`, every `-` and the indent are in the same position — on
 ## Cross-Input Consistency
 
 When the same source phrase or UI label appears in multiple inputs (or multiple times within one input), translate it **the same way every time**. Never alternate between variants for the same source term in one batch.
+
+## Quote Style — Use Target-Locale Typography
+
+Quotation marks are locale-specific punctuation. **Always use the target locale's convention**, regardless of which style appears in the source. A German source quoting `„Hilfe"` translated into English must become `"Help"`, not `„Help"`.
+
+| Target locale family            | Open | Close | Example                       |
+|---------------------------------|------|-------|-------------------------------|
+| en-*, nl-*, es-*, it-*, pt-*    | "    | "     | the **"Help"** tab            |
+| de-*, cs-*, sk-*, pl-*, sl-*, hr-*, hu-*, ro-*, bg-* | „    | "     | der Reiter **„Hilfe"**         |
+| fr-*                            | «    | »     | l'onglet **« Aide »** (with NBSP inside) |
+
+**Apostrophes** likewise follow the target locale (`'` curly in English, `'` straight only in code).
+
+**Exception:** inside fenced code blocks (```` ```…``` ````) and inside HTML attributes, **preserve quotes verbatim** — do not localize them, since they are syntactically significant.
+
+## Articles Before Quoted Labels
+
+When an article (`a` / `an` / `the` / `un` / `une` / `der` / `die` / `das` / …) precedes a quoted UI label, choose the article that matches how the **label is spoken in the target locale** — not the literal characters or punctuation around it.
+
+Example: `"an 'Restore old account' button"` is wrong because "Restore" starts with a consonant sound — write `"a 'Restore old account' button"` instead.
 
 ## Mandatory Target Locale
 
