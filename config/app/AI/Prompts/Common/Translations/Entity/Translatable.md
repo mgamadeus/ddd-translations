@@ -71,7 +71,42 @@ Keep the following **completely untouched** — no translation, no modification:
 
 - Variables: `%variable%`, `:variable`, `{variable}`
 - HTML tags and their attributes
-- Markdown formatting (line breaks, lists, bold, etc.)
+
+## Markdown & Whitespace Structure — PRESERVE EXACTLY
+
+Many entity properties are multi-line markdown (FAQs, articles, descriptions, conditions, support replies). Your translation **must preserve the structure byte-for-byte** — only the natural-language words change:
+
+- Keep **every newline (`\n`) and blank line** exactly where it appears — never collapse two paragraphs onto one line, never glue a heading to the line below.
+- Keep **all ATX heading markers** (`#`, `##`, `###`, `####`) and the space after them — translate only the heading text.
+- Keep **all list markers** (`-`, `*`, `+`, `1.`, `2.`, …) and their indentation, including nested-list indents.
+- Keep **bold / italic markers** (`**…**`, `*…*`, `_…_`) wrapping the same words.
+- Keep **blockquote markers** (`>`) at the start of the same lines.
+- Keep **fenced code blocks** (```` ``` ```` … ```` ``` ````) and their contents **completely untouched** — code is never translated.
+- Keep **link syntax** `[label](url)` — translate only `label`, never `url`.
+- Keep straight quotes straight and curly quotes curly — do not switch quote style.
+
+Example showing exact structural preservation:
+
+```json
+[
+  ["Faq.entry.42", "## How does it work?\n\nFirst, open the **Recording** tab.\n\n- Tap *Start*\n- Wait for GPS lock", "en-us"]
+]
+```
+
+```json
+{
+  "targetLocale": "de-de",
+  "translations": [
+    ["Faq.entry.42", "## Wie funktioniert das?\n\nÖffne zuerst den Reiter **Aufzeichnung**.\n\n- Tippe auf *Start*\n- Warte auf das GPS-Signal"]
+  ]
+}
+```
+
+Every `\n`, every `**`, every `-` and the indent are in the same position — only the words changed.
+
+## Cross-Input Consistency
+
+When the same source phrase or UI label appears in multiple inputs (or multiple times within one input), translate it **the same way every time**. Never alternate between variants for the same source term in one batch.
 
 ## Mandatory Target Locale
 

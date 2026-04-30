@@ -58,9 +58,12 @@ class ArgusTranslations extends Translations
     {
         $prompt = $this->getAIPrompt();
         $firstLocale = $this->localesToTranslateAtOnce->first();
-        $langaugeToTranslate = $firstLocale->languageCode;
-        $defaultLocale = $firstLocale;
-        $prompt->setParameter('default_locale', $defaultLocale->languageCode . '-' . $defaultLocale->countryShortCode)
+        $localeString = $firstLocale->languageCode . '-' . $firstLocale->countryShortCode;
+        // Set both placeholder names — `default_locale` for App-style prompts and `targetLocale`
+        // for Entity-style prompts — so the same Argus repo can serve either prompt family.
+        $prompt
+            ->setParameter('default_locale', $localeString)
+            ->setParameter('targetLocale', $localeString)
             ->setParameter('locales', $this->localesToTranslateAtOnce->getLocalesAsCommaSeparatedString());
         return $prompt;
     }
@@ -97,8 +100,29 @@ class ArgusTranslations extends Translations
         $locale = $this->localesToTranslateAtOnce->first();
         $defaultWritingStyle = $this->getParent()->defaultWritingStyle;
 
-        // Normalize: the model may return either the expected array-of-arrays
-        // [[id, text], ...] or a JSON object {id: text, ...} (common with json_object response format).
+        // Three response shapes are accepted:
+        //   1. Entity prompt wrapper: {"targetLocale": "de-de", "translations": [[id, text], ...]}
+        //   2. App prompt object:     {"<id>": "<translation>", ...}
+        //   3. Raw array-of-arrays:   [[id, text], ...]
+        // Detection order matters: the Entity wrapper is itself a JSON object, so we have to peek
+        // at its structure before falling back to the App-style object branch.
+        $entityPairs = $this->extractEntityWrapperPairs($decodedResult);
+        if ($entityPairs !== null) {
+            foreach ($entityPairs as $pair) {
+                if (!is_array($pair) || !isset($pair[0], $pair[1])) {
+                    continue;
+                }
+                $this->add(new ArgusTranslation(
+                    externalId: (string)$pair[0],
+                    content: (string)$pair[1],
+                    locale: $locale,
+                    writingStyle: $defaultWritingStyle,
+                    context: Text::CONTEXT_ONE
+                ));
+            }
+            return;
+        }
+
         $isObject = is_object($decodedResult) || (is_array($decodedResult) && !array_is_list($decodedResult));
         if ($isObject) {
             $pairs = (array)$decodedResult;
@@ -124,5 +148,32 @@ class ArgusTranslations extends Translations
                 $this->add($argusTranslation);
             }
         }
+    }
+
+    /**
+     * If $decoded is the Entity-prompt wrapper shape — an object with a `translations` array of
+     * `[externalId, translatedText]` pairs — return that array of pairs. Otherwise return null,
+     * letting the caller fall back to App-style or raw-array handling.
+     *
+     * @param mixed $decoded
+     * @return array<int, array{0: string|int, 1: string}>|null
+     */
+    protected function extractEntityWrapperPairs(mixed $decoded): ?array
+    {
+        $translations = null;
+        if (is_object($decoded) && isset($decoded->translations) && is_array($decoded->translations)) {
+            $translations = $decoded->translations;
+        } elseif (is_array($decoded) && !array_is_list($decoded) && isset($decoded['translations']) && is_array($decoded['translations'])) {
+            $translations = $decoded['translations'];
+        }
+        if ($translations === null || $translations === []) {
+            return null;
+        }
+        // Confirm the shape: list of [id, text] pairs.
+        $first = $translations[0] ?? null;
+        if (!is_array($first) || !array_is_list($first) || count($first) < 2) {
+            return null;
+        }
+        return $translations;
     }
 }
