@@ -80,7 +80,24 @@ class ArgusTranslations extends Translations
             }
             $textsToTranslate[] = $row;
         }
-        return json_encode($textsToTranslate, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        // JSON_INVALID_UTF8_SUBSTITUTE replaces malformed UTF-8 byte sequences with U+FFFD
+        // (the Unicode replacement character) instead of letting json_encode return false.
+        // Without it, a single broken codepoint anywhere in the input would cause this method
+        // to violate its `: string|array` return type and throw a TypeError. The substitute
+        // path is preferable: the LLM still gets a coherent JSON payload and the worst case
+        // is one ? character in the output, instead of the whole translation failing.
+        $encoded = json_encode(
+            $textsToTranslate,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE,
+        );
+        if ($encoded === false) {
+            // Should not be reachable with INVALID_UTF8_SUBSTITUTE in place, but the contract
+            // demands string|array and json_encode could still fail on circular references etc.
+            throw new \RuntimeException(
+                'ArgusTranslations::getUserContent(): json_encode failed: ' . json_last_error_msg(),
+            );
+        }
+        return $encoded;
     }
 
     protected function applyLoadResult(string $resultText): void
@@ -112,13 +129,17 @@ class ArgusTranslations extends Translations
                 if (!is_array($pair) || !isset($pair[0], $pair[1])) {
                     continue;
                 }
-                $this->add(new ArgusTranslation(
+                // Must assign to a variable first — ObjectSet::add() takes its parameter
+                // by reference (&...$elements), and PHP only allows variables (not direct
+                // `new X(...)` expressions) to be passed to reference parameters.
+                $argusTranslation = new ArgusTranslation(
                     externalId: (string)$pair[0],
                     content: (string)$pair[1],
                     locale: $locale,
                     writingStyle: $defaultWritingStyle,
-                    context: Text::CONTEXT_ONE
-                ));
+                    context: Text::CONTEXT_ONE,
+                );
+                $this->add($argusTranslation);
             }
             return;
         }

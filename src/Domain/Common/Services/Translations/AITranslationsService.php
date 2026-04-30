@@ -34,7 +34,16 @@ class AITranslationsService
      * Structural integrity across chunks is handled by the hierarchical chunker, which splits
      * at H2/H3/paragraph boundaries and reassembles via implode('') byte-for-byte.
      */
-    protected const int MAX_CHARS_PER_BUCKET = 1000;
+    protected const int MAX_CHARS_PER_BUCKET = 3000;
+
+    /**
+     * Maximum number of attempts (initial + retries) to obtain translations for every submitted
+     * chunk. The LLM occasionally drops IDs from its response (rate-limit, malformed JSON, model
+     * skip) — without a retry, those drops would silently produce a translated document with
+     * mid-text holes. After this many attempts, missing chunks raise a RuntimeException so the
+     * caller never deploys a stealth-truncated translation.
+     */
+    protected const int MAX_TRANSLATION_ATTEMPTS = 4;
 
     /**
      * Translates all Entities of given EntitySet
@@ -181,13 +190,17 @@ class AITranslationsService
      */
     public function translateTexts(Texts $texts): Texts
     {
-        $textsBuckets = new TextsBuckets();
         /** @var AIPromptsService $aiPromptsService */
         $aiPromptsService = DDDService::instance()->getService(AIPromptsService::class);
-
         $maxCharsPerBucket = self::MAX_CHARS_PER_BUCKET;
 
-        // Running state per locale+writingStyle: current bucket + accumulated char count
+        // ─── 1) Build initial buckets + record what we expect back ────────────────────────
+        // $expectedChunks tracks every (localeKey, externalId) pair we send to the LLM.
+        // We need the source content + writingStyle so we can rebuild fresh Text objects on retry.
+        // Format: $expectedChunks[localeKey][externalId] = ['content' => str, 'writingStyle' => str]
+        $expectedChunks = [];
+
+        $textsBuckets = new TextsBuckets();
         $currentBucketByKey = [];
         $charCountByKey = [];
         $bucketCounterByKey = [];
@@ -214,11 +227,10 @@ class AITranslationsService
 
                 $contentLength = strlen($text->content ?? '');
 
-                // If a single text exceeds the char limit, chunk it. Chunks are then packed into
-                // buckets like ordinary texts — multiple small chunks can share one bucket so the
-                // LLM sees them together (better terminology consistency), and a single bucket
-                // never exceeds maxCharsPerBucket.
                 if ($contentLength > $maxCharsPerBucket) {
+                    // Chunk the text. Chunks are packed into buckets like ordinary texts — multiple
+                    // small chunks can share one bucket (better terminology consistency for the LLM)
+                    // and a single bucket never exceeds maxCharsPerBucket.
                     $chunks = $this->chunkText($text->content, $maxCharsPerBucket);
 
                     foreach ($chunks as $chunkIndex => $chunk) {
@@ -238,17 +250,21 @@ class AITranslationsService
                             $textsBuckets->add($currentBucketByKey[$localeWritingStyleKey]);
                         }
 
+                        $chunkExternalId = $text->externalId . '.chunk.' . $chunkIndex;
                         $chunkedText = new Text();
                         $chunkedText->content = $chunk;
-                        $chunkedText->externalId = $text->externalId . '.chunk.' . $chunkIndex;
+                        $chunkedText->externalId = $chunkExternalId;
                         $chunkedText->writingStyle = $writingStyle;
                         $currentBucketByKey[$localeWritingStyleKey]->add($chunkedText);
                         $charCountByKey[$localeWritingStyleKey] += $chunkLength;
+
+                        $expectedChunks[$localeWritingStyleKey][$chunkExternalId] = [
+                            'content'      => $chunk,
+                            'writingStyle' => $writingStyle,
+                        ];
                     }
                 } else {
-                    // Check if adding this text would exceed the batch char limit
                     if ($charCountByKey[$localeWritingStyleKey] + $contentLength > $maxCharsPerBucket) {
-                        // Start a new bucket
                         $bucketCounterByKey[$localeWritingStyleKey]++;
                         $currentBucketByKey[$localeWritingStyleKey] = $this->createBucketForLocale(
                             $locale,
@@ -267,6 +283,11 @@ class AITranslationsService
                     $textForLocale->writingStyle = $writingStyle;
                     $currentBucketByKey[$localeWritingStyleKey]->add($textForLocale);
                     $charCountByKey[$localeWritingStyleKey] += $contentLength;
+
+                    $expectedChunks[$localeWritingStyleKey][$text->externalId] = [
+                        'content'      => $text->content ?? '',
+                        'writingStyle' => $writingStyle,
+                    ];
                 }
             }
         }
@@ -279,55 +300,81 @@ class AITranslationsService
             }
         }
 
-        // Execute all buckets in parallel via Argus
-        $argusTextsBuckets = new ArgusTextsBuckets();
-        $argusTextsBuckets->fromEntity($nonEmptyBuckets);
-        $argusTextsBuckets->setPropertiesToLoad(ArgusTranslations::class);
-        $argusTextsBuckets->argusLoad(useArgusEntityCache: false, useApiACallCache: false);
+        // ─── 2) Run argusLoad + retry-on-missing loop ─────────────────────────────────────
+        // The LLM occasionally drops IDs from its response (rate-limit, model skip, malformed
+        // JSON). Without retry, those drops would silently produce a translated document with
+        // mid-text holes. We track which (localeKey, externalId) we're still waiting for, and
+        // re-issue smaller buckets for just the missing ones, up to MAX_TRANSLATION_ATTEMPTS.
+        $chunkedResults = [];   // [localeKey][originalExternalId][chunkIndex] = content
+        $stillMissing = $expectedChunks;
+        $bucketsToProcess = $nonEmptyBuckets;
 
-        // Collect all translations, handling chunk reassembly
-        // Structure: $chunkedResults[locale::writingStyle][originalExternalId][chunkIndex] = translatedText
-        $chunkedResults = [];
+        for ($attempt = 1; $attempt <= self::MAX_TRANSLATION_ATTEMPTS; $attempt++) {
+            if ($bucketsToProcess->count() === 0) {
+                break;
+            }
 
-        foreach ($argusTextsBuckets->getElements() as $textsForLocale) {
-            foreach ($textsForLocale->getTranslations()->getElements() as $translation) {
-                $externalId = $translation->externalId;
-                $localeStr = (string)$translation->locale;
-                $writingStyle = $translation->writingStyle;
-                $localeWritingStyleKey = $localeStr . '::' . $writingStyle;
+            $argusTextsBuckets = new ArgusTextsBuckets();
+            $argusTextsBuckets->fromEntity($bucketsToProcess);
+            $argusTextsBuckets->setPropertiesToLoad(ArgusTranslations::class);
+            $argusTextsBuckets->argusLoad(useArgusEntityCache: false, useApiACallCache: false);
 
-                // Check if this is a chunked translation
-                $chunkCharIndex = strpos($externalId, '.chunk.');
-                if ($chunkCharIndex !== false) {
-                    $originalExternalId = substr($externalId, 0, $chunkCharIndex);
-                    $chunkIndex = (int)substr($externalId, $chunkCharIndex + 7);
+            foreach ($argusTextsBuckets->getElements() as $textsForLocale) {
+                foreach ($textsForLocale->getTranslations()->getElements() as $translation) {
+                    $externalId = $translation->externalId;
+                    $localeStr = (string)$translation->locale;
+                    $writingStyle = $translation->writingStyle;
+                    $localeWritingStyleKey = $localeStr . '::' . $writingStyle;
 
-                    if (!isset($chunkedResults[$localeWritingStyleKey])) {
-                        $chunkedResults[$localeWritingStyleKey] = [];
+                    // Mark as received — clears it from the still-missing set so retry passes
+                    // don't ask for it again.
+                    unset($stillMissing[$localeWritingStyleKey][$externalId]);
+                    if (isset($stillMissing[$localeWritingStyleKey])
+                        && empty($stillMissing[$localeWritingStyleKey])) {
+                        unset($stillMissing[$localeWritingStyleKey]);
                     }
-                    if (!isset($chunkedResults[$localeWritingStyleKey][$originalExternalId])) {
-                        $chunkedResults[$localeWritingStyleKey][$originalExternalId] = [];
-                    }
-                    $chunkedResults[$localeWritingStyleKey][$originalExternalId][$chunkIndex] = $translation->content;
-                } else {
-                    // Non-chunked: apply directly
-                    $text = $texts->getByExternalId($externalId);
-                    if (!$text) {
-                        continue;
-                    }
-                    $originalTranslationInstance = $text->translations->getTranslationForParameters(
-                        externalId: $text->externalId,
-                        locale: $translation->locale,
-                        writingStyle: $translation->writingStyle
-                    );
-                    if ($originalTranslationInstance) {
-                        $originalTranslationInstance->content = $translation->content;
+
+                    // Store result. Chunked vs non-chunked is determined by the externalId suffix.
+                    $chunkCharIndex = strpos($externalId, '.chunk.');
+                    if ($chunkCharIndex !== false) {
+                        $originalExternalId = substr($externalId, 0, $chunkCharIndex);
+                        $chunkIndex = (int)substr($externalId, $chunkCharIndex + 7);
+
+                        if (!isset($chunkedResults[$localeWritingStyleKey])) {
+                            $chunkedResults[$localeWritingStyleKey] = [];
+                        }
+                        if (!isset($chunkedResults[$localeWritingStyleKey][$originalExternalId])) {
+                            $chunkedResults[$localeWritingStyleKey][$originalExternalId] = [];
+                        }
+                        $chunkedResults[$localeWritingStyleKey][$originalExternalId][$chunkIndex] = $translation->content;
+                    } else {
+                        // Non-chunked: apply directly to the original Text's translation slot.
+                        $text = $texts->getByExternalId($externalId);
+                        if (!$text) {
+                            continue;
+                        }
+                        $originalTranslationInstance = $text->translations->getTranslationForParameters(
+                            externalId: $text->externalId,
+                            locale: $translation->locale,
+                            writingStyle: $translation->writingStyle
+                        );
+                        if ($originalTranslationInstance) {
+                            $originalTranslationInstance->content = $translation->content;
+                        }
                     }
                 }
             }
+
+            if (empty($stillMissing)) {
+                break;
+            }
+            if ($attempt === self::MAX_TRANSLATION_ATTEMPTS) {
+                break;
+            }
+            $bucketsToProcess = $this->buildBucketsForRetry($stillMissing, $aiPromptsService, $maxCharsPerBucket);
         }
 
-        // Reassemble chunked translations
+        // ─── 3) Reassemble chunked translations ────────────────────────────────────────────
         foreach ($chunkedResults as $localeWritingStyleKey => $translationsByExternalId) {
             [$localeStr, $writingStyle] = explode('::', $localeWritingStyleKey);
             $locale = Locale::fromString($localeStr);
@@ -350,7 +397,109 @@ class AITranslationsService
             }
         }
 
+        // ─── 4) Surface incomplete translations ────────────────────────────────────────────
+        // After exhausting retries, anything still missing means the LLM kept dropping that ID.
+        // Throwing here is preferable to silently returning a translation with mid-document
+        // holes — the caller decides whether to retry the whole call, mark the entity as
+        // partially translated, or surface to the user.
+        if (!empty($stillMissing)) {
+            $missingCount = 0;
+            $sampleIds = [];
+            foreach ($stillMissing as $localeKey => $byExternalId) {
+                $missingCount += count($byExternalId);
+                foreach (array_keys($byExternalId) as $extId) {
+                    if (count($sampleIds) < 5) {
+                        $sampleIds[] = $localeKey . '/' . $extId;
+                    }
+                }
+            }
+            throw new \RuntimeException(sprintf(
+                'AITranslationsService::translateTexts: %d chunk(s) still missing after %d attempts'
+                . ' across %d locale-style combinations. Examples: %s',
+                $missingCount,
+                self::MAX_TRANSLATION_ATTEMPTS,
+                count($stillMissing),
+                implode(', ', $sampleIds)
+            ));
+        }
+
         return $texts;
+    }
+
+    /**
+     * Re-pack still-missing chunks into a fresh TextsBuckets for another argusLoad pass.
+     *
+     * Creates new Text objects (not reusing the originals submitted in the previous attempt)
+     * so the retry pipeline sees a clean entity set without any leftover state from the
+     * previous Argus call. The bucket-packing is the same locale-grouped char-budgeted logic
+     * as the initial pass, just operating on a much smaller input set.
+     *
+     * @param array<string, array<string, array{content: string, writingStyle: string}>> $stillMissing
+     *   Map of [localeWritingStyleKey][externalId] = ['content' => ..., 'writingStyle' => ...].
+     *   localeWritingStyleKey has the form "{locale}::{writingStyle}", produced by
+     *   `(string)$locale . '::' . $writingStyle` matching the format used by translateTexts.
+     * @return TextsBuckets
+     */
+    protected function buildBucketsForRetry(
+        array $stillMissing,
+        AIPromptsService $aiPromptsService,
+        int $maxCharsPerBucket
+    ): TextsBuckets {
+        $buckets = new TextsBuckets();
+        $currentBucketByKey = [];
+        $charCountByKey = [];
+        $bucketCounterByKey = [];
+
+        foreach ($stillMissing as $localeWritingStyleKey => $byExternalId) {
+            // Recover the Locale object from the composite key.
+            $separatorPos = strrpos($localeWritingStyleKey, '::');
+            if ($separatorPos === false) {
+                continue;
+            }
+            $localeStr = substr($localeWritingStyleKey, 0, $separatorPos);
+            $writingStyle = substr($localeWritingStyleKey, $separatorPos + 2);
+            $locale = Locale::fromString($localeStr);
+
+            foreach ($byExternalId as $externalId => $chunkInfo) {
+                $contentLength = strlen($chunkInfo['content'] ?? '');
+
+                if (!isset($currentBucketByKey[$localeWritingStyleKey])) {
+                    $bucketCounterByKey[$localeWritingStyleKey] = 0;
+                    $currentBucketByKey[$localeWritingStyleKey] = $this->createBucketForLocale(
+                        $locale,
+                        $writingStyle,
+                        $localeWritingStyleKey,
+                        $bucketCounterByKey[$localeWritingStyleKey],
+                        $aiPromptsService
+                    );
+                    $charCountByKey[$localeWritingStyleKey] = 0;
+                    $buckets->add($currentBucketByKey[$localeWritingStyleKey]);
+                }
+
+                if ($charCountByKey[$localeWritingStyleKey] > 0
+                    && $charCountByKey[$localeWritingStyleKey] + $contentLength > $maxCharsPerBucket) {
+                    $bucketCounterByKey[$localeWritingStyleKey]++;
+                    $currentBucketByKey[$localeWritingStyleKey] = $this->createBucketForLocale(
+                        $locale,
+                        $writingStyle,
+                        $localeWritingStyleKey,
+                        $bucketCounterByKey[$localeWritingStyleKey],
+                        $aiPromptsService
+                    );
+                    $charCountByKey[$localeWritingStyleKey] = 0;
+                    $buckets->add($currentBucketByKey[$localeWritingStyleKey]);
+                }
+
+                $retryText = new Text();
+                $retryText->content = $chunkInfo['content'];
+                $retryText->externalId = $externalId;
+                $retryText->writingStyle = $chunkInfo['writingStyle'];
+                $currentBucketByKey[$localeWritingStyleKey]->add($retryText);
+                $charCountByKey[$localeWritingStyleKey] += $contentLength;
+            }
+        }
+
+        return $buckets;
     }
 
     /**
@@ -480,7 +629,11 @@ class AITranslationsService
                         $chunks[] = $current;
                         $current = '';
                     }
-                    foreach (str_split($segment, $maxChars) as $frag) {
+                    // mb_str_split: cuts at codepoint boundaries. str_split would slice by bytes
+                    // and break multi-byte UTF-8 sequences (e.g. curly quotes, em dashes), producing
+                    // partial codepoints that later cause json_encode to return false in
+                    // ArgusTranslations::getUserContent.
+                    foreach (mb_str_split($segment, $maxChars, 'UTF-8') as $frag) {
                         $chunks[] = $frag;
                     }
                 }
@@ -645,14 +798,101 @@ class AITranslationsService
      */
     public function chunkTextRegex(string $text, int $maxChars): array
     {
-        $merged = $this->splitAndMerge($text, '/(?<=[.?!])(\s+)(?=[A-Z])/u');
+        // Sentence-boundary regex extended for international text:
+        //   - Terminators: . ? ! and U+2026 ellipsis (…)
+        //   - Optional closing-quote/paren after the punctuation: " ' ) ] U+201D U+00BB
+        //     (covers `."`, `?»`, `!)`, `."` for English/German/French close-quotes)
+        //   - Required whitespace separator
+        //   - Lookahead for the next sentence start: any Unicode uppercase letter (\p{Lu} —
+        //     covers Cyrillic, Greek, Latin extended; not just ASCII A–Z), a digit (numbered
+        //     lists "1." starting next sentence), or a bullet marker (- * U+2022).
+        //   - Deliberately NOT matching a following lowercase letter, to avoid false positives
+        //     on abbreviations like "U.S. economy" or "z.B. siehe" where the period isn't a
+        //     sentence break.
+        $sentenceBoundary = '/([.?!\x{2026}][\x{201D}\x{00BB}"\)\]]?\s+)(?=[\p{Lu}\d\-*\x{2022}])/u';
+        $merged = $this->splitAndMerge($text, $sentenceBoundary);
 
-        if (count($merged) <= 1) {
-            // No usable sentence boundary — hard-cut as a last resort.
-            return str_split($text, $maxChars);
+        if (count($merged) > 1) {
+            return $this->packParts($merged, $maxChars);
         }
 
-        return $this->packParts($merged, $maxChars);
+        // No sentence boundary detected. If the text is only modestly oversized, prefer keeping
+        // it whole over slicing it: a single ~25%-over-limit chunk is far better than a chunk
+        // containing a sentence fragment. Only kicks in at the leaf (after every structural
+        // split — heading, paragraph, line, sentence — has already been tried and rejected).
+        $tolerance = (int)($maxChars * 0.25);
+        if (mb_strlen($text, 'UTF-8') <= $maxChars + $tolerance) {
+            return [$text];
+        }
+
+        // Still too long: try cutting at word boundaries (last whitespace before each maxChars
+        // window) so we at least don't slice through a word.
+        return $this->chunkAtWordBoundaries($text, $maxChars);
+    }
+
+    /**
+     * Greedy word-boundary chunker.
+     *
+     * Walks $text in $maxChars-character windows, snapping each cut to the last whitespace
+     * inside the window. If a window contains no whitespace at all (a long URL, a single
+     * unbroken word, etc.), falls back to a codepoint-safe hard cut at exactly $maxChars
+     * characters — the absolute last resort and the only point where we accept mid-word splits.
+     *
+     * Always cuts at codepoint boundaries (uses mb_substr / mb_strlen / preg_match with `/u`),
+     * so no partial UTF-8 sequences ever leak out — that would otherwise crash json_encode in
+     * ArgusTranslations::getUserContent.
+     *
+     * @param string $text
+     * @param int $maxChars
+     * @return string[]
+     */
+    protected function chunkAtWordBoundaries(string $text, int $maxChars): array
+    {
+        // Termination guard: a non-positive $maxChars would let the loop's "no-match" branch
+        // set $cutLength = 0 and never advance $offset → infinite loop, hung process. The
+        // current MAX_CHARS_PER_BUCKET constant rules this out, but a future programmatic
+        // caller (or a test misconfiguring it) shouldn't be able to lock the worker.
+        if ($maxChars < 1) {
+            return [$text];
+        }
+
+        $chunks = [];
+        $textLength = mb_strlen($text, 'UTF-8');
+        $offset = 0;
+
+        while ($offset < $textLength) {
+            $remaining = $textLength - $offset;
+            if ($remaining <= $maxChars) {
+                $chunks[] = mb_substr($text, $offset, null, 'UTF-8');
+                break;
+            }
+
+            $window = mb_substr($text, $offset, $maxChars, 'UTF-8');
+
+            // Greedy match against everything up to the last whitespace inside the window.
+            // The `s` flag lets `.` match newlines too (matters for paragraph-spanning prose).
+            // If the window has no whitespace at all, preg_match returns 0 and we fall back
+            // to a codepoint-safe hard cut at $maxChars.
+            if (preg_match('/^(.*)\s\S*$/su', $window, $matches)) {
+                // +1 codepoint to also consume the whitespace itself, keeping the next chunk's
+                // text from starting with a stray leading space.
+                $cutLength = mb_strlen($matches[1], 'UTF-8') + 1;
+            } else {
+                $cutLength = $maxChars;
+            }
+
+            // Belt-and-braces: $cutLength must be ≥ 1 to guarantee progress. The branches
+            // above all produce ≥ 1 when $maxChars ≥ 1 (which the guard enforces), but if a
+            // future change breaks that invariant we want a hung process, not a quiet loop.
+            if ($cutLength < 1) {
+                $cutLength = 1;
+            }
+
+            $chunks[] = mb_substr($text, $offset, $cutLength, 'UTF-8');
+            $offset += $cutLength;
+        }
+
+        return $chunks;
     }
 
 }
