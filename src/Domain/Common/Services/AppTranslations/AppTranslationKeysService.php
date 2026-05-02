@@ -103,6 +103,11 @@ class AppTranslationKeysService extends EntitiesService
 
         if ($randomOrder) {
             $queryBuilder->orderBy('RAND()');
+        } else {
+            // Deterministic ascending order on the primary key — required for cursor-based
+            // pagination via $minAppTranslationKeyId. Without it, the underlying storage
+            // may return rows in an unstable order between pages.
+            $queryBuilder->orderBy("$baseModelAlias.id", 'ASC');
         }
 
         if ($limit) {

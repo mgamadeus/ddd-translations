@@ -41,6 +41,23 @@ use ReflectionException;
 class AppTranslationsService extends Service
 {
     /**
+     * Page size for cursor-paginated iteration over untranslated keys in
+     * {@see self::generateAppTranslationsForLocale()}. Each page is dispatched as one or more
+     * async translation jobs while the next page is being fetched, so total wall time is
+     * dominated by Argus throughput rather than the sequential DB round-trips.
+     */
+    public const int APP_TRANSLATIONS_KEYS_PAGE_SIZE = 200;
+
+    /**
+     * Hard upper bound on cursor-pagination iterations in {@see self::generateAppTranslationsForLocale()}.
+     * At PAGE_SIZE=200 this covers 20 million keys — orders of magnitude above any realistic
+     * app translation table. Acts as a defensive guard so a misbehaving cursor (DB returning
+     * rows that don't match the id-filter, identity-map glitches, transient entities without
+     * ids) can never spin the loop forever.
+     */
+    protected const int APP_TRANSLATIONS_MAX_ITERATIONS = 100_000;
+
+    /**
      * Returns an array with the most often used words in AppTranslationKeys
      *
      * @return array
@@ -263,15 +280,7 @@ class AppTranslationsService extends Service
     ): AppTranslationsResult {
         $aiModelsService = new AIModelsService();
         $defaultTerms = $this->findDefaultTermsForLanguageId($locale->languageId);
-        if (!$translationKeys) {
-            $translationKeys = $this->findUntranslatedKeysForLanguage(
-                $locale->languageId,
-                limit: null,
-                writingStyle: $writingStyle,
-                minAppTranslationId: $minAppTranslationId,
-                translateReTranslateSetKeys: $translateReTranslateSetKeys,
-            );
-        }
+
         $aiPromptName = $writingStyle == Text::WRITING_STYLE_INFORMAL ? TranslationPrompts::APP_TRANSLATIONS_SINGLE_LOCALE_INFORMAL : TranslationPrompts::APP_TRANSLATIONS_SINGLE_LOCALE_FORMAL;
         /** @var AIPromptsService $aiPromptsService */
         $aiPromptsService = DDDService::instance()->getService(AIPromptsService::class);
@@ -292,64 +301,139 @@ class AppTranslationsService extends Service
         $estimatedTotalOutputTokens = 0;
         $apiCalls = 0;
         $translatedCount = 0;
-        $texts = new Texts();
-        $texts->defaultWritingStyle = $writingStyle;
-        $texts->addLocaleToTranslateAtOnce(locale: $locale);
-        $texts->getTranslations()->translationsAIPrompt = $translationsAIPrompt;
+        $texts = $this->createAppTranslationsTextsBucket($writingStyle, $locale, $translationsAIPrompt);
 
         // As length of output can differ in various languages we use only 40% of the available output capacity
         $maxTokensUsableForOutput = $translationAIModel->settings->maxOutputTokens * 0.4;
 
-        foreach ($translationKeys->getElements() as $translationKey) {
-            $rowToTranslate = [$translationKey->id ?? '', $translationKey->getContentToTranslate()];
-            $rowToTranslateWithoutHint = $rowToTranslate;
-            if (isset($translationKey->translationHint)) {
-                $rowToTranslate[] = $translationKey->translationHint;
+        // Cursor-paginated walk over untranslated keys (id-ascending). When the caller passes
+        // an explicit $translationKeys set we honour it as a single batch; otherwise we page
+        // through all untranslated rows. Each completed bucket is dispatched async so that
+        // the worker queue translates page N in parallel with the DB fetch of page N+1 — the
+        // HTTP request returns once all dispatches are queued, not after Argus completes.
+        //
+        // Termination guarantees (in order):
+        //   1. $batchCount === 0                            → break
+        //   2. $batchCount  <  PAGE_SIZE                    → while-condition false, exit
+        //   3. cursor does not strictly advance             → break (defensive: protects against
+        //      non-existent edge cases like rows with id=null/0 or DB ignoring the id-filter)
+        //   4. iterationCount >= APP_TRANSLATIONS_MAX_ITERATIONS → break (hard cap)
+        $useCursorPagination = $translationKeys === null;
+        $cursorMinId = $minAppTranslationId;
+        $iterationCount = 0;
+
+        do {
+            $iterationCount++;
+            if ($iterationCount > self::APP_TRANSLATIONS_MAX_ITERATIONS) {
+                DDDService::instance()->getLogger()->error(
+                    sprintf(
+                        'AppTranslationsService::generateAppTranslationsForLocale: aborted after %d iterations '
+                        . '(locale=%s, writingStyle=%s, lastCursor=%s) — possible cursor stagnation, investigate.',
+                        self::APP_TRANSLATIONS_MAX_ITERATIONS,
+                        $locale->languageCode . '-' . $locale->countryShortCode,
+                        $writingStyle,
+                        $cursorMinId === null ? 'null' : (string)$cursorMinId,
+                    )
+                );
+                break;
             }
-            $estimatedUserContentTokens = AIPromptsService::getTokenCountForStringToTranslate(
-                json_encode($rowToTranslate),
-                'en'
-            );
 
-            $estimatedOutputTokens = AIPromptsService::getTokenCountForStringToTranslate(
-                json_encode($rowToTranslateWithoutHint),
-                $locale->languageCode
-            );
-            $currentUserContentTokensRequired += $estimatedUserContentTokens;
-            $estimatedTotalOutputTokens += $estimatedOutputTokens;
-            $currentEstimatedOutputTokensRequired += $estimatedOutputTokens;
+            if ($useCursorPagination) {
+                $batch = $this->findUntranslatedKeysForLanguage(
+                    $locale->languageId,
+                    limit: self::APP_TRANSLATIONS_KEYS_PAGE_SIZE,
+                    writingStyle: $writingStyle,
+                    minAppTranslationId: $cursorMinId,
+                    translateReTranslateSetKeys: $translateReTranslateSetKeys,
+                );
+            } else {
+                $batch = $translationKeys;
+            }
 
-            if ($currentEstimatedOutputTokensRequired > $maxTokensUsableForOutput) {
-                $translatedCount += $texts->count();
-                $apiCalls++;
-                $totalInputTokens += $currentUserContentTokensRequired + $promptTokensRequired;
-                $currentUserContentTokensRequired = 0;
-                $currentEstimatedOutputTokensRequired = 0;
-                if (!$previewOnly) {
-                    $texts->translate();
+            $batchCount = $batch->count();
+            if ($batchCount === 0) {
+                break;
+            }
+
+            $maxIdInBatch = 0;
+            foreach ($batch->getElements() as $translationKey) {
+                $keyId = (int)($translationKey->id ?? 0);
+                if ($keyId > $maxIdInBatch) {
+                    $maxIdInBatch = $keyId;
                 }
-                unset($texts);
-                $texts = new Texts();
-                $texts->defaultWritingStyle = $writingStyle;
-                $texts->addLocaleToTranslateAtOnce(locale: $locale);
-                $texts->getTranslations()->translationsAIPrompt = $translationsAIPrompt;
+
+                $rowToTranslate = [$translationKey->id ?? '', $translationKey->getContentToTranslate()];
+                $rowToTranslateWithoutHint = $rowToTranslate;
+                if (isset($translationKey->translationHint)) {
+                    $rowToTranslate[] = $translationKey->translationHint;
+                }
+                $estimatedUserContentTokens = AIPromptsService::getTokenCountForStringToTranslate(
+                    json_encode($rowToTranslate),
+                    'en'
+                );
+
+                $estimatedOutputTokens = AIPromptsService::getTokenCountForStringToTranslate(
+                    json_encode($rowToTranslateWithoutHint),
+                    $locale->languageCode
+                );
+                $currentUserContentTokensRequired += $estimatedUserContentTokens;
+                $estimatedTotalOutputTokens += $estimatedOutputTokens;
+                $currentEstimatedOutputTokensRequired += $estimatedOutputTokens;
+
+                if ($currentEstimatedOutputTokensRequired > $maxTokensUsableForOutput) {
+                    $translatedCount += $texts->count();
+                    $apiCalls++;
+                    $totalInputTokens += $currentUserContentTokensRequired + $promptTokensRequired;
+                    $currentUserContentTokensRequired = 0;
+                    $currentEstimatedOutputTokensRequired = 0;
+                    if (!$previewOnly) {
+                        // async = true: the AppTranslationsMessage is queued and the worker
+                        // performs the Argus call. This loop keeps fetching the next page
+                        // immediately rather than blocking on the AI roundtrip.
+                        $texts->translate(async: true);
+                    }
+                    unset($texts);
+                    $texts = $this->createAppTranslationsTextsBucket($writingStyle, $locale, $translationsAIPrompt);
+                }
+                $text = new Text(
+                    content: ($translationKey?->translationTemplate ?? null) ? $translationKey?->translationTemplate : $translationKey->key,
+                    language: 'en',
+                    externalId: $translationKey->id,
+                    requiresContext: $translationKey->requiresContext ?? false,
+                    translationHint: $translationKey->translationHint ?? null
+                );
+                $texts->add($text);
             }
-            $text = new Text(
-                content: ($translationKey?->translationTemplate ?? null) ? $translationKey?->translationTemplate : $translationKey->key,
-                language: 'en',
-                externalId: $translationKey->id,
-                requiresContext: $translationKey->requiresContext ?? false,
-                translationHint: $translationKey->translationHint ?? null
-            );
-            $texts->add($text);
-        }
+
+            // Forward-progress invariant: the next cursor MUST be strictly greater than the
+            // current one. If it isn't, the foreach saw rows whose ids do not satisfy the
+            // id >= cursorMinId filter (e.g. NULL/0 ids on transient entities, or the filter
+            // wasn't applied). We break instead of risking an endless loop.
+            $nextCursor = $maxIdInBatch + 1;
+            if ($cursorMinId !== null && $nextCursor <= $cursorMinId) {
+                DDDService::instance()->getLogger()->warning(
+                    sprintf(
+                        'AppTranslationsService::generateAppTranslationsForLocale: cursor would not advance '
+                        . '(currentCursor=%d, maxIdInBatch=%d, batchCount=%d) — exiting pagination defensively.',
+                        $cursorMinId,
+                        $maxIdInBatch,
+                        $batchCount,
+                    )
+                );
+                break;
+            }
+            $cursorMinId = $nextCursor;
+
+            // A short page (< page size) means we've drained the result set — exit.
+        } while ($useCursorPagination && $batchCount === self::APP_TRANSLATIONS_KEYS_PAGE_SIZE);
+
         // handle the remaining texts
         if ($texts->count()) {
             $apiCalls++;
             $totalInputTokens += $currentUserContentTokensRequired + $promptTokensRequired;
             $translatedCount += $texts->count();
             if (!$previewOnly) {
-                $texts->translate();
+                $texts->translate(async: true);
             }
         }
         $averageTokensPerApiCall = (int)($apiCalls ? $totalInputTokens / $apiCalls : 0);
@@ -366,6 +450,28 @@ class AppTranslationsService extends Service
             $translationAIModel,
             $textsToReturn
         );
+    }
+
+    /**
+     * Builds a fresh Texts bucket pre-configured for App Translations against the given locale,
+     * writing style, and translation prompt. Extracted so that the paginated translate loop can
+     * recreate buckets cleanly between flush points.
+     *
+     * @param string $writingStyle
+     * @param Locale $locale
+     * @param AIPrompt $translationsAIPrompt
+     * @return Texts
+     */
+    protected function createAppTranslationsTextsBucket(
+        string $writingStyle,
+        Locale $locale,
+        AIPrompt $translationsAIPrompt
+    ): Texts {
+        $texts = new Texts();
+        $texts->defaultWritingStyle = $writingStyle;
+        $texts->addLocaleToTranslateAtOnce(locale: $locale);
+        $texts->getTranslations()->translationsAIPrompt = $translationsAIPrompt;
+        return $texts;
     }
 
     /**
