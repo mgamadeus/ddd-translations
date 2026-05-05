@@ -129,6 +129,25 @@ $results->calculateTotalCosts();
 echo $results->totalCosts->amount;  // MoneyAmount
 ```
 
+### How `generateAppTranslationsForLocale` runs
+
+Internally it walks the untranslated-keys table with a cursor-paginated `id ASC` loop (page size `AppTranslationsService::APP_TRANSLATIONS_KEYS_PAGE_SIZE`, currently 200) and dispatches each filled token-bucket as an `AppTranslationsMessage` via `$texts->translate(async: true)`. The caller's HTTP request returns once all dispatches are queued — the actual Argus calls happen in the messenger worker. So:
+
+- Calling this from an admin button doesn't block the request on translation throughput.
+- After clicking, expect many `AppTranslationsMessage` rows in the queue, drained by workers in parallel.
+- `previewOnly: true` walks the same pagination but skips dispatch — token/cost estimates now cover the full untranslated set, not just the first page.
+
+### Active filter: `Language.isActive` vs `Locale.isActive`
+
+There is an asymmetry between the "generate" path and the "completeness" path that has caused real bugs (a Locale showing as fully translated in the UI but not picked up by generate-all):
+
+| Method | Filters on |
+|---|---|
+| `generateAppTranslationsForActiveLocales()` | `Language.isActive` (via `LanguagesService::findActiveLanguages`) |
+| `AppTranslationKeysService::getCompletenessForActiveLocales()` | `Locale.isActive` (via `Locales` QueryOptions filter) |
+
+If a Locale is `isActive=true` but its underlying `Language.isActive=false`, completeness will count it but generate-all will silently skip it. When a language "looks active" in the admin but isn't being translated, check **both** the Language row and the Locale row.
+
 ### Importing from Config
 
 ```php
