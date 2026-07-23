@@ -16,6 +16,7 @@ use DDD\Domain\Base\Entities\Entity;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoad;
 use DDD\Domain\Base\Entities\LazyLoad\LazyLoadRepo;
 use DDD\Domain\Base\Entities\QueryOptions\QueryOptionsTrait;
+use DDD\Domain\Base\Repo\DB\Database\DatabaseForeignKey;
 use DDD\Domain\Base\Repo\DB\Database\DatabaseIndex;
 use DDD\Domain\Base\Repo\DB\Database\DatabaseVirtualColumn;
 use DDD\Infrastructure\Validation\Constraints\Choice;
@@ -55,7 +56,16 @@ class AppTranslationValue extends Entity
     public ?int $countryId = null;
 
     /** @var Country|null Individual Country for translation */
+    // RESTRICT (not the derived CASCADE): countryId is the base of a STORED virtual column ((IFNULL(countryId, 0)) for
+    // the nullable-safe unique key), and MariaDB forbids CASCADE / SET NULL FK actions on the base of a stored
+    // generated column (error 138 on DELETE). Also semantically correct — a Country with existing translation values
+    // must not cascade-delete them. (DDD core downgrades this automatically now, but the explicit declaration documents
+    // the intent and keeps the DDL stable.)
     #[LazyLoad(addAsParent: true)]
+    #[DatabaseForeignKey(
+        onUpdateAction: DatabaseForeignKey::ACTION_RESTRICT,
+        onDeleteAction: DatabaseForeignKey::ACTION_RESTRICT
+    )]
     public ?Country $country;
 
     /** @var string The translation context, one or many for singular and plural differentiation (e.g. for Project, Projects depending on number) */
