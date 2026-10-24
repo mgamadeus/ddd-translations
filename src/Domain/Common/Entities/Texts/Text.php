@@ -49,7 +49,7 @@ class Text extends ValueObject
     public ?Locale $locale;
 
     /** @var string Writing style of the content (personal or formal) */
-    #[Choice([self::WRITING_STYLE_INFORMAL, self::WRITING_STYLE_FORMAL])]
+    #[Choice(choices: [self::WRITING_STYLE_INFORMAL, self::WRITING_STYLE_FORMAL])]
     public string $writingStyle = self::WRITING_STYLE_INFORMAL;
 
     /** @var Texts Translations of the text */
@@ -62,7 +62,7 @@ class Text extends ValueObject
     public bool $requiresContext = false;
 
     /** @var string The translation context, one or many for singular and plural differentiation (e.g. for Project, Projects depending on number) */
-    #[Choice([self::CONTEXT_ONE, self::CONTEXT_MANY])]
+    #[Choice(choices: [self::CONTEXT_ONE, self::CONTEXT_MANY])]
     public string $context = self::CONTEXT_ONE;
 
     /** @var TextEmbedding Generated with Embedding Model */

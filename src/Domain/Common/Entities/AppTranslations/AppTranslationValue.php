@@ -69,11 +69,11 @@ class AppTranslationValue extends Entity
     public ?Country $country;
 
     /** @var string The translation context, one or many for singular and plural differentiation (e.g. for Project, Projects depending on number) */
-    #[Choice([Text::CONTEXT_ONE, Text::CONTEXT_MANY])]
+    #[Choice(choices: [Text::CONTEXT_ONE, Text::CONTEXT_MANY])]
     public string $context = Text::CONTEXT_ONE;
 
     /** @var string The writing style of the translation */
-    #[Choice([Text::WRITING_STYLE_FORMAL, Text::WRITING_STYLE_INFORMAL])]
+    #[Choice(choices: [Text::WRITING_STYLE_FORMAL, Text::WRITING_STYLE_INFORMAL])]
     public string $writingStyle = Text::WRITING_STYLE_INFORMAL;
 
     public function uniqueKey(): string

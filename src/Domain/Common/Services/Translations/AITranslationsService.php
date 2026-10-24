@@ -133,7 +133,7 @@ class AITranslationsService
     public function getTextToTranslateFromTranslationsArray(
         Locales $localesToTranslate,
         ?array $translations = null,
-        string $externalId = null,
+        ?string $externalId = null,
         bool $forceRetranslation = false
     ): ?Text {
         // nothing to do here

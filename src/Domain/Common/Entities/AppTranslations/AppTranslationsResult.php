@@ -18,7 +18,7 @@ class AppTranslationsResult extends DefaultObject
     public ?Locale $locale;
 
     /** @var string The writing style of the translations */
-    #[Choice([Text::WRITING_STYLE_FORMAL, Text::WRITING_STYLE_INFORMAL])]
+    #[Choice(choices: [Text::WRITING_STYLE_FORMAL, Text::WRITING_STYLE_INFORMAL])]
     public string $writingStyle = Text::WRITING_STYLE_INFORMAL;
 
     /** @var int|null The number of translated keys */

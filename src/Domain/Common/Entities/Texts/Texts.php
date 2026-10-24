@@ -28,7 +28,7 @@ use ReflectionException;
 class Texts extends ObjectSet
 {
     /** @var string Writing style of the content (personal or formal) */
-    #[Choice([Text::WRITING_STYLE_INFORMAL, Text::WRITING_STYLE_FORMAL])]
+    #[Choice(choices: [Text::WRITING_STYLE_INFORMAL, Text::WRITING_STYLE_FORMAL])]
     public string $defaultWritingStyle = Text::WRITING_STYLE_INFORMAL;
 
     /** @var Translations|null Tranlsations can relate to a single text or to multiple texts at once */
