@@ -3,7 +3,7 @@
     "description": "Texts, entity translations, app translations, embeddings for mgamadeus/ddd",
     "minimum-stability": "stable",
     "license": "MIT",
-    "version": "1.0.26",
+    "version": "1.0.27",
     "authors": [
         {
             "name": "Marius-Eugen Gerdan",
@@ -11,7 +11,7 @@
         }
     ],
     "require": {
-        "mgamadeus/ddd": "^2.10",
+        "mgamadeus/ddd": "^2.10 || ^3.0",
         "mgamadeus/ddd-ai": "^1.4.1 || ^2.0",
         "mgamadeus/ddd-common-money": "^1.1.1",
         "mgamadeus/ddd-common-political": "^1.0"
