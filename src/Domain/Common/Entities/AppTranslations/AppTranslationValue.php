@@ -28,7 +28,9 @@ use Symfony\Component\Validator\Constraints\Length;
  */
 #[LazyLoadRepo(LazyLoadRepo::DB, DBAppTranslationValue::class)]
 #[RolesRequiredForUpdate(Role::ADMIN)]
-#[DatabaseIndex(DatabaseIndex::TYPE_UNIQUE, ['appTranslationKeyId', 'languageId', 'virtualCountryId'])]
+// writingStyle is part of the identity: a FORMAL and an INFORMAL value of one key, language and country coexist
+// (AppTranslatableService falls back from one to the other) — without it a FORMAL save overwrote the INFORMAL value
+#[DatabaseIndex(DatabaseIndex::TYPE_UNIQUE, ['appTranslationKeyId', 'languageId', 'virtualCountryId', 'writingStyle'])]
 class AppTranslationValue extends Entity
 {
     use ChangeHistoryTrait, QueryOptionsTrait;
